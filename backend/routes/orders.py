@@ -1,0 +1,204 @@
+from flask import Blueprint, jsonify, request
+from models import db, Order, OrderItem, ProductVariant, DiscountCode, User
+
+orders_bp = Blueprint('orders', __name__)
+
+
+# ─── Checkout ────────────────────────────────────────────────────────────────
+
+@orders_bp.route('/checkout', methods=['POST'])
+def checkout():
+    data = request.get_json(silent=True) or {}
+
+    # Validate required fields
+    required = ['customer_name', 'customer_email', 'customer_phone',
+                'address_line1', 'city', 'state', 'pincode', 'items', 'domain']
+    for field in required:
+        if not data.get(field):
+            return jsonify({"error": f"{field} is required"}), 400
+
+    items = data.get('items', [])
+    if not items:
+        return jsonify({"error": "Cart is empty"}), 400
+
+    domain = data.get('domain', 'garba.shop')
+
+    VALID_PRICE_KEYS = {'price_b2c', 'price_b2b_ttd', 'price_b2b_maharashtra'}
+    price_key = data.get('price_key', 'price_b2c')
+    if price_key not in VALID_PRICE_KEYS:
+        price_key = 'price_b2c'
+
+    def get_price(variant):
+        return float(getattr(variant, price_key) or 0)
+
+    # Calculate subtotal and validate stock
+    subtotal = 0.0
+    order_items_data = []
+
+    for item in items:
+        variant_id = item.get('variant_id')
+        if not variant_id:
+            return jsonify({"error": "One or more cart items is missing a variant. Please re-add items to cart."}), 400
+        variant = ProductVariant.query.get(variant_id)
+        if not variant:
+            return jsonify({"error": f"Variant {variant_id} not found. It may have been removed."}), 400
+        qty = item.get('quantity', 1)
+        if variant.quantity < qty:
+            return jsonify({"error": f"Only {variant.quantity} units available for a selected item."}), 400
+        price = get_price(variant)
+        subtotal += price * qty
+        order_items_data.append({
+            "variant": variant,
+            "quantity": qty,
+            "price": price
+        })
+
+    # Apply discount code if provided
+    discount_amount = 0.0
+    discount_code_used = None
+    code_str = data.get('discount_code', '').strip().upper()
+    if code_str:
+        code = DiscountCode.query.filter_by(code=code_str, is_active=True).first()
+        if code:
+            if subtotal >= (code.min_cart_value or 0):
+                if code.discount_flat:
+                    discount_amount = float(code.discount_flat)
+                elif code.discount_percentage:
+                    discount_amount = round(subtotal * float(code.discount_percentage) / 100, 2)
+                discount_code_used = code_str
+
+    # Shipping: free above ₹999
+    shipping_charge = 0.0 if subtotal >= 999 else 99.0
+
+    total_amount = subtotal - discount_amount + shipping_charge
+
+    # Create order
+    order = Order(
+        customer_name=data['customer_name'],
+        customer_email=data['customer_email'],
+        customer_phone=data['customer_phone'],
+        address_line1=data['address_line1'],
+        address_line2=data.get('address_line2', ''),
+        city=data['city'],
+        state=data['state'],
+        pincode=data['pincode'],
+        subtotal=subtotal,
+        discount_amount=discount_amount,
+        discount_code=discount_code_used,
+        shipping_charge=shipping_charge,
+        tax_amount=0.0,
+        total_amount=total_amount,
+        domain_origin=domain,
+        payment_method='COD',
+        status='pending_payment'
+    )
+
+    # Link to user if whatsapp number provided
+    whatsapp = data.get('whatsapp_number')
+    if whatsapp:
+        user = User.query.filter_by(whatsapp_number=whatsapp).first()
+        if user:
+            order.user_id = user.id
+
+    db.session.add(order)
+    db.session.flush()  # get order.id
+
+    # Create order items and deduct stock
+    for item_data in order_items_data:
+        oi = OrderItem(
+            order_id=order.id,
+            variant_id=item_data['variant'].id,
+            quantity=item_data['quantity'],
+            price_at_purchase=item_data['price']
+        )
+        db.session.add(oi)
+        # Deduct stock
+        item_data['variant'].quantity -= item_data['quantity']
+
+    db.session.commit()
+
+    return jsonify({
+        "message": "Order placed successfully",
+        "order_id": order.id,
+        "total_amount": total_amount,
+        "status": order.status,
+        "payment_method": order.payment_method
+    }), 201
+
+
+# ─── Track Order ─────────────────────────────────────────────────────────────
+
+@orders_bp.route('/track/<int:order_id>', methods=['GET'])
+def track_order(order_id):
+    o = Order.query.get_or_404(order_id)
+    
+    # Get full item details with product info
+    items_detail = []
+    for item in o.items:
+        variant = ProductVariant.query.get(item.variant_id)
+        if variant and variant.product:
+            items_detail.append({
+                "variant_id": item.variant_id,
+                "product_id": variant.product.id,
+                "product_name": variant.product.name,
+                "image_url": variant.product.image_url,
+                "color": variant.color,
+                "size": variant.size,
+                "quantity": item.quantity,
+                "price_at_purchase": float(item.price_at_purchase)
+            })
+    
+    return jsonify({
+        "order_id": o.id,
+        "status": o.status,
+        "tracking_number": o.tracking_number,
+        "customer_name": o.customer_name,
+        "customer_email": o.customer_email,
+        "customer_phone": o.customer_phone,
+        "address": {
+            "line1": o.address_line1,
+            "line2": o.address_line2,
+            "city": o.city,
+            "state": o.state,
+            "pincode": o.pincode
+        },
+        "subtotal": float(o.subtotal),
+        "discount_amount": float(o.discount_amount),
+        "discount_code": o.discount_code,
+        "shipping_charge": float(o.shipping_charge),
+        "total_amount": float(o.total_amount),
+        "payment_method": o.payment_method,
+        "created_at": o.created_at.isoformat(),
+        "items": items_detail
+    })
+
+
+# ─── My Orders ───────────────────────────────────────────────────────────────
+
+@orders_bp.route('/my-orders', methods=['GET'])
+def my_orders():
+    whatsapp = request.args.get('whatsapp_number')
+    if not whatsapp:
+        return jsonify({"error": "whatsapp_number is required"}), 400
+    user = User.query.filter_by(whatsapp_number=whatsapp).first()
+    if not user:
+        return jsonify([])
+    orders = Order.query.filter_by(user_id=user.id).order_by(Order.created_at.desc()).all()
+    result = []
+    for o in orders:
+        result.append({
+            "order_id": o.id,
+            "status": o.status,
+            "total_amount": o.total_amount,
+            "payment_method": o.payment_method,
+            "created_at": o.created_at.isoformat(),
+            "tracking_number": o.tracking_number,
+            "items": [
+                {
+                    "variant_id": item.variant_id,
+                    "quantity": item.quantity,
+                    "price_at_purchase": item.price_at_purchase
+                } for item in o.items
+            ]
+        })
+    return jsonify(result)

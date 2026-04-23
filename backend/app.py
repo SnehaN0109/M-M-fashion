@@ -1,25 +1,49 @@
-from flask import Flask, jsonify
+from flask import Flask, jsonify, send_from_directory
 from flask_cors import CORS
 from config import Config
 from models import db
 from sqlalchemy import text
+import os
+
 
 def create_app():
     app = Flask(__name__)
     app.config.from_object(Config)
 
-    CORS(app, resources={r"/api/*": {"origins": "http://localhost:5173"}})
+    CORS(app, resources={r"/api/*": {"origins": [
+        "http://localhost:5173",
+        "http://localhost:5174",
+        "http://localhost:5175",
+        "http://localhost:5176",
+        "https://garba.shop",
+        "https://ttd.in"
+    ]}})
+
     db.init_app(app)
 
-    # Register Blueprints
+    # ── Register Blueprints ──────────────────────────────────────────────────
     from routes.products import products_bp
-    app.register_blueprint(products_bp, url_prefix='/api/products')
+    from routes.admin_dashboard import admin_bp
+    from routes.auth import auth_bp
+    from routes.orders import orders_bp
+    from routes.cart_orders import cart_orders_bp
 
+    app.register_blueprint(products_bp, url_prefix='/api/products')
+    app.register_blueprint(admin_bp, url_prefix='/api/admin')
+    app.register_blueprint(auth_bp, url_prefix='/api/auth')
+    app.register_blueprint(orders_bp, url_prefix='/api/orders')
+    app.register_blueprint(cart_orders_bp, url_prefix='/api')
+
+    # ── Health check ─────────────────────────────────────────────────────────
     @app.route("/")
     def home():
-        return {"message": "M&M Fashion backend running"}
+        return jsonify({"message": "M&M Fashion backend running"})
 
-    # Test Routes
+    @app.route("/uploads/photos/<path:filename>")
+    def serve_photo(filename):
+        upload_dir = os.path.join(os.path.dirname(__file__), 'uploads', 'photos')
+        return send_from_directory(upload_dir, filename)
+
     @app.route("/api/test-db")
     def test_db():
         try:
@@ -28,16 +52,8 @@ def create_app():
         except Exception as e:
             return jsonify({"status": "error", "message": str(e)}), 500
 
-    @app.route("/api/test-products")
-    def test_products():
-        from models import Product
-        try:
-            products = Product.query.all()
-            return jsonify([{"id": p.id, "name": p.name} for p in products])
-        except Exception as e:
-            return jsonify({"error": str(e)}), 500
-
     return app
+
 
 app = create_app()
 

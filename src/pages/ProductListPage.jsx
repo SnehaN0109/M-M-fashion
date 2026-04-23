@@ -103,7 +103,7 @@ const Filters = ({ onFilter, activeFilters }) => {
 };
 
 const ProductListPage = ({ category: initialCategory }) => {
-  const { domain } = useDomain();
+  const { domain, priceKey } = useDomain();
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -114,6 +114,7 @@ const ProductListPage = ({ category: initialCategory }) => {
     try {
       const queryParams = new URLSearchParams({
         domain: domain || window.location.hostname,
+        price_key: priceKey || "price_b2c",
         category: initialCategory || "",
         ...filters
       });

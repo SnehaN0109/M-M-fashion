@@ -1,9 +1,12 @@
+import os
+import uuid
 from flask import Blueprint, jsonify, request
-from models import db, Product, ProductVariant
+from werkzeug.utils import secure_filename
+from models import db, Product, ProductVariant, Review, UserPhoto, User, SiteSetting
 
 products_bp = Blueprint('products', __name__)
 
-@products_bp.route('/', methods=['GET'])
+@products_bp.route('/', methods=['GET'], strict_slashes=False)
 def get_products():
     domain = request.args.get('domain')
     category = request.args.get('category')
@@ -12,6 +15,11 @@ def get_products():
     min_price = request.args.get('min_price', type=float)
     max_price = request.args.get('max_price', type=float)
     search = request.args.get('search')
+
+    VALID_PRICE_KEYS = {'price_b2c', 'price_b2b_ttd', 'price_b2b_maharashtra'}
+    price_key = request.args.get('price_key', 'price_b2c')
+    if price_key not in VALID_PRICE_KEYS:
+        price_key = 'price_b2c'
 
     query = Product.query
 
@@ -37,13 +45,8 @@ def get_products():
 
         variant_data = []
         for v in variants:
-            # Pricing logic
-            if domain == "ttd.in":
-                price = float(v.price_b2b_ttd) if v.price_b2b_ttd else 0.0
-            elif domain == "maharashtra":
-                price = float(v.price_b2b_maharashtra) if v.price_b2b_maharashtra else 0.0
-            else:
-                price = float(v.price_b2c) if v.price_b2c else 0.0
+            # Use price_key to select correct price column
+            price = float(getattr(v, price_key) or 0)
 
             # Price range filter
             if min_price is not None and price < min_price:
@@ -76,19 +79,18 @@ def get_products():
 
     return jsonify(result)
 
-@products_bp.route('/<int:product_id>', methods=['GET'])
+@products_bp.route('/<int:product_id>', methods=['GET'], strict_slashes=False)
 def get_product(product_id):
-    domain = request.args.get('domain')
+    VALID_PRICE_KEYS = {'price_b2c', 'price_b2b_ttd', 'price_b2b_maharashtra'}
+    price_key = request.args.get('price_key', 'price_b2c')
+    if price_key not in VALID_PRICE_KEYS:
+        price_key = 'price_b2c'
+
     p = Product.query.get_or_404(product_id)
-    
+
     variant_data = []
     for v in p.variants:
-        if domain == "ttd.in":
-            price = float(v.price_b2b_ttd) if v.price_b2b_ttd else 0.0
-        elif domain == "maharashtra":
-            price = float(v.price_b2b_maharashtra) if v.price_b2b_maharashtra else 0.0
-        else:
-            price = float(v.price_b2c) if v.price_b2c else 0.0
+        price = float(getattr(v, price_key) or 0)
 
         variant_data.append({
             "id": v.id,
@@ -109,3 +111,109 @@ def get_product(product_id):
         "video_url": p.video_url,
         "variants": variant_data
     })
+
+
+UPLOAD_FOLDER = os.path.join(os.path.dirname(__file__), '..', 'uploads', 'photos')
+ALLOWED_EXTENSIONS = {'jpg', 'jpeg', 'png', 'webp'}
+
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+
+# ─── Reviews ─────────────────────────────────────────────────────────────────
+
+@products_bp.route('/<int:product_id>/reviews', methods=['GET'], strict_slashes=False)
+def get_reviews(product_id):
+    Product.query.get_or_404(product_id)
+    reviews = Review.query.filter_by(product_id=product_id).order_by(Review.created_at.desc()).all()
+    return jsonify([{
+        "id": r.id,
+        "rating": r.rating,
+        "comment": r.comment,
+        "created_at": r.created_at.isoformat()
+    } for r in reviews])
+
+
+@products_bp.route('/<int:product_id>/reviews', methods=['POST'], strict_slashes=False)
+def add_review(product_id):
+    Product.query.get_or_404(product_id)
+    data = request.json
+    rating = data.get('rating')
+    if not rating or not (1 <= int(rating) <= 5):
+        return jsonify({"error": "Rating must be between 1 and 5"}), 400
+
+    whatsapp = data.get('whatsapp_number')
+    user_id = None
+    if whatsapp:
+        user = User.query.filter_by(whatsapp_number=whatsapp).first()
+        if user:
+            user_id = user.id
+
+    review = Review(
+        product_id=product_id,
+        user_id=user_id,
+        rating=int(rating),
+        comment=data.get('comment', '').strip() or None
+    )
+    db.session.add(review)
+    db.session.commit()
+    return jsonify({"message": "Review submitted", "id": review.id}), 201
+
+
+# ─── User Photos ─────────────────────────────────────────────────────────────
+
+@products_bp.route('/<int:product_id>/photos', methods=['GET'], strict_slashes=False)
+def get_photos(product_id):
+    Product.query.get_or_404(product_id)
+    photos = UserPhoto.query.filter_by(product_id=product_id, is_approved=True).all()
+    return jsonify([{
+        "id": p.id,
+        "photo_url": p.photo_url,
+        "created_at": p.created_at.isoformat()
+    } for p in photos])
+
+
+@products_bp.route('/<int:product_id>/photos', methods=['POST'], strict_slashes=False)
+def upload_photo(product_id):
+    Product.query.get_or_404(product_id)
+
+    whatsapp = request.form.get('whatsapp_number')
+    if not whatsapp:
+        return jsonify({"error": "whatsapp_number is required"}), 400
+
+    user = User.query.filter_by(whatsapp_number=whatsapp).first()
+    if not user:
+        return jsonify({"error": "User not found. Please login first."}), 404
+
+    if 'photo' not in request.files:
+        return jsonify({"error": "No photo file provided"}), 400
+
+    file = request.files['photo']
+    if file.filename == '' or not allowed_file(file.filename):
+        return jsonify({"error": "Invalid file. Allowed: jpg, jpeg, png, webp"}), 400
+
+    os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+    ext = file.filename.rsplit('.', 1)[1].lower()
+    filename = f"{uuid.uuid4().hex}.{ext}"
+    filepath = os.path.join(UPLOAD_FOLDER, filename)
+    file.save(filepath)
+
+    photo_url = f"/uploads/photos/{filename}"
+
+    photo = UserPhoto(
+        product_id=product_id,
+        user_id=user.id,
+        photo_url=photo_url,
+        is_approved=False  # pending admin approval
+    )
+    db.session.add(photo)
+    db.session.commit()
+    return jsonify({"message": "Photo uploaded successfully. Pending admin approval.", "id": photo.id}), 201
+
+
+@products_bp.route('/settings/popup', methods=['GET'], strict_slashes=False)
+def get_public_popup():
+    setting = SiteSetting.query.filter_by(key='welcome_popup').first()
+    if not setting:
+        return jsonify({"message": "", "is_active": False})
+    return jsonify({"message": setting.value, "is_active": setting.is_active})

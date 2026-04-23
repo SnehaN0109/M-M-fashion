@@ -1,20 +1,36 @@
 import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { useDomain } from "../context/DomainContext";
 import ProductCard from "../components/ProductCard";
 import { ChevronDown, Sparkles, Loader2, PackageX } from "lucide-react";
 
 const HomePage = () => {
-  const { showSliders, showWelcomeOffer, domain } = useDomain();
+  const { showSliders, showWelcomeOffer, domain, priceKey } = useDomain();
+  const navigate = useNavigate();
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [visibleCount, setVisibleCount] = useState(8);
   const [error, setError] = useState(null);
+  const [popupMsg, setPopupMsg] = useState("");
+
+  useEffect(() => {
+    if (showWelcomeOffer) {
+      fetch(`${import.meta.env.VITE_API_URL}/api/products/settings/popup`)
+        .then(r => r.json())
+        .then(d => {
+          if (d.is_active) setPopupMsg(d.message);
+        })
+        .catch(() => {});
+    }
+  }, [showWelcomeOffer]);
 
   const fetchFeatured = async () => {
     setLoading(true);
     try {
       const currentDomain = domain || window.location.hostname;
-      const response = await fetch(`http://localhost:5000/api/products/?domain=${currentDomain}`);
+      const response = await fetch(
+        `${import.meta.env.VITE_API_URL}/api/products/?domain=${currentDomain}&price_key=${priceKey || "price_b2c"}`
+      );
       if (!response.ok) throw new Error("Connection lost");
       const data = await response.json();
       setProducts(data);
@@ -33,11 +49,11 @@ const HomePage = () => {
     <div className="min-h-screen bg-white">
       
       {/* Dynamic Promo Banner */}
-      {showWelcomeOffer && (
+      {showWelcomeOffer && popupMsg && (
         <div className="bg-pink-600 text-white overflow-hidden relative">
           <div className="max-w-7xl mx-auto py-3 px-6 text-center text-xs font-black uppercase tracking-[0.3em] flex items-center justify-center gap-4">
              <Sparkles size={16} />
-             <span>Welcome Offer: 10% OFF your first order with code <span className="underline decoration-2 underline-offset-4">FIRST10</span></span>
+             <span>{popupMsg}</span>
              <Sparkles size={16} />
           </div>
         </div>
@@ -47,7 +63,7 @@ const HomePage = () => {
       {showSliders && (
         <div className="relative w-full h-[70vh] bg-gray-900 overflow-hidden">
            <img 
-              src="https://images.unsplash.com/photo-1490481651871-ab68de25d43d?q=80&w=2070&auto=format&fit=crop" 
+              src="/src/assets/images/web_banner.jpg" 
               className="w-full h-full object-cover opacity-60"
               alt="Hero"
            />
@@ -59,7 +75,10 @@ const HomePage = () => {
               <p className="max-w-lg text-lg font-medium text-gray-200 mb-10 leading-relaxed">
                 Discover the latest seasonal trends crafted with care and designed for the modern individual.
               </p>
-              <button className="px-12 py-5 bg-white text-gray-900 font-black rounded-full shadow-2xl hover:bg-pink-600 hover:text-white transition-all transform hover:scale-105 active:scale-95">
+              <button 
+                onClick={() => navigate('/products')}
+                className="px-12 py-5 bg-white text-gray-900 font-black rounded-full shadow-2xl hover:bg-pink-600 hover:text-white transition-all transform hover:scale-105 active:scale-95"
+              >
                 SHOP THE LOOK
               </button>
            </div>
