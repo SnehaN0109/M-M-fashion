@@ -1,5 +1,6 @@
 from flask import Blueprint, jsonify, request
 from models import db, Order, OrderItem, ProductVariant, DiscountCode, User
+from utils import resolve_price_key, is_b2b_domain
 
 orders_bp = Blueprint('orders', __name__)
 
@@ -22,11 +23,21 @@ def checkout():
         return jsonify({"error": "Cart is empty"}), 400
 
     domain = data.get('domain', 'garba.shop')
+    b2b = is_b2b_domain(domain)
 
-    VALID_PRICE_KEYS = {'price_b2c', 'price_b2b_ttd', 'price_b2b_maharashtra'}
-    price_key = data.get('price_key', 'price_b2c')
-    if price_key not in VALID_PRICE_KEYS:
-        price_key = 'price_b2c'
+    # ── Role check: B2B domains require WHOLESALER role ──────────────────────
+    # If user is not a wholesaler, silently fall back to B2C pricing (safe degradation)
+    effective_domain = domain
+    whatsapp = data.get('whatsapp_number', '').strip()
+    if b2b and whatsapp:
+        user_check = User.query.filter_by(whatsapp_number=whatsapp).first()
+        if not user_check or user_check.role != 'WHOLESALER':
+            # Non-wholesaler attempting B2B domain — fall back to B2C pricing
+            effective_domain = 'garba.shop'
+            b2b = False
+
+    # Resolve price_key server-side from effective domain — never trust client-provided price_key
+    price_key = resolve_price_key(effective_domain)
 
     def get_price(variant):
         return float(getattr(variant, price_key) or 0)
@@ -39,13 +50,31 @@ def checkout():
         variant_id = item.get('variant_id')
         if not variant_id:
             return jsonify({"error": "One or more cart items is missing a variant. Please re-add items to cart."}), 400
-        variant = ProductVariant.query.get(variant_id)
+        # with_for_update() acquires a row-level lock so concurrent checkouts
+        # are serialised — prevents overselling when two requests race.
+        variant = ProductVariant.query.with_for_update().get(variant_id)
         if not variant:
             return jsonify({"error": f"Variant {variant_id} not found. It may have been removed."}), 400
+
         qty = item.get('quantity', 1)
+
+        # ── Stock check ───────────────────────────────────────────────────────
         if variant.quantity < qty:
             return jsonify({"error": f"Only {variant.quantity} units available for a selected item."}), 400
+
+        # ── MOQ check (B2B only) ──────────────────────────────────────────────
+        if b2b and variant.moq_b2b and qty < variant.moq_b2b:
+            return jsonify({
+                "error": f"Minimum order quantity is {variant.moq_b2b} units for this item."
+            }), 400
+
+        # ── Price safety check ────────────────────────────────────────────────
         price = get_price(variant)
+        if price is None or price <= 0:
+            return jsonify({
+                "error": "Invalid price configuration for one or more items. Please contact support."
+            }), 400
+
         subtotal += price * qty
         order_items_data.append({
             "variant": variant,
@@ -67,8 +96,11 @@ def checkout():
                     discount_amount = round(subtotal * float(code.discount_percentage) / 100, 2)
                 discount_code_used = code_str
 
-    # Shipping: free above ₹999
-    shipping_charge = 0.0 if subtotal >= 999 else 99.0
+    # ── Shipping: B2B always free; B2C free above ₹999 ───────────────────────
+    if b2b:
+        shipping_charge = 0.0
+    else:
+        shipping_charge = 0.0 if subtotal >= 999 else 99.0
 
     total_amount = subtotal - discount_amount + shipping_charge
 
@@ -90,11 +122,13 @@ def checkout():
         total_amount=total_amount,
         domain_origin=domain,
         payment_method='COD',
-        status='pending_payment'
+        status='pending_payment',
+        # B2B optional fields
+        business_name=data.get('business_name') if b2b else None,
+        gst_number=data.get('gst_number') if b2b else None,
     )
 
     # Link to user if whatsapp number provided
-    whatsapp = data.get('whatsapp_number')
     if whatsapp:
         user = User.query.filter_by(whatsapp_number=whatsapp).first()
         if user:

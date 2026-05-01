@@ -48,7 +48,7 @@ const UploadUserPhotosPage = () => {
     formData.append("whatsapp_number", whatsapp);
 
     try {
-      const res = await fetch(`http://localhost:5000/api/products/${productId}/photos`, {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/products/${productId}/photos`, {
         method: "POST",
         body: formData,
       });
@@ -57,7 +57,7 @@ const UploadUserPhotosPage = () => {
 
       // Optionally submit review too
       if (rating > 0 || review.trim()) {
-        await fetch(`http://localhost:5000/api/products/${productId}/reviews`, {
+        await fetch(`${import.meta.env.VITE_API_URL}/api/products/${productId}/reviews`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ rating, comment: review.trim(), whatsapp_number: whatsapp }),

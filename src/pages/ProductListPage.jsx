@@ -118,7 +118,7 @@ const ProductListPage = ({ category: initialCategory }) => {
         category: initialCategory || "",
         ...filters
       });
-      const response = await fetch(`http://localhost:5000/api/products/?${queryParams}`);
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/products/?${queryParams}`);
       if (!response.ok) throw new Error("Our shop is currently restyling. Please try again later.");
       const data = await response.json();
       setProducts(data);
@@ -131,7 +131,7 @@ const ProductListPage = ({ category: initialCategory }) => {
 
   useEffect(() => {
     fetchProducts();
-  }, [domain, initialCategory]);
+  }, [domain, priceKey, initialCategory]);
 
   const handleFilter = (filters) => {
     fetchProducts(filters);

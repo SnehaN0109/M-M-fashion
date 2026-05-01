@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useContext, useState } from 'react';
 
 const DomainContext = createContext();
 
@@ -41,35 +41,29 @@ const DOMAIN_CONFIGS = {
   },
 };
 
-const DEFAULT_CONFIG = DOMAIN_CONFIGS['garba.shop'];
+// Resolve domain config synchronously — no useEffect, no async delay
+const resolveConfig = () => {
+  const hostname = window.location.hostname;
+
+  if (hostname.includes('ttd.in')) {
+    return { domain: hostname, ...DOMAIN_CONFIGS['ttd.in'] };
+  }
+  if (hostname.includes('garba.shop')) {
+    return { domain: hostname, ...DOMAIN_CONFIGS['garba.shop'] };
+  }
+  if (hostname.includes('maharashtra') || hostname.includes('maha')) {
+    return { domain: hostname, ...DOMAIN_CONFIGS['maharashtra'] };
+  }
+
+  // localhost — read from localStorage for dev testing
+  const testDomain = localStorage.getItem('test_domain') || 'garba.shop';
+  const matched = DOMAIN_CONFIGS[testDomain] || DOMAIN_CONFIGS['garba.shop'];
+  return { domain: testDomain, ...matched };
+};
 
 export const DomainProvider = ({ children }) => {
-  const [domainConfig, setDomainConfig] = useState({
-    domain: 'localhost',
-    ...DEFAULT_CONFIG,
-  });
-
-  useEffect(() => {
-    const hostname = window.location.hostname;
-
-    let matched = DEFAULT_CONFIG;
-    let resolvedDomain = hostname;
-
-    if (hostname.includes('ttd.in')) {
-      matched = DOMAIN_CONFIGS['ttd.in'];
-    } else if (hostname.includes('garba.shop')) {
-      matched = DOMAIN_CONFIGS['garba.shop'];
-    } else if (hostname.includes('maharashtra') || hostname.includes('maha')) {
-      matched = DOMAIN_CONFIGS['maharashtra'];
-    } else {
-      // localhost fallback — read from localStorage for dev testing
-      const testDomain = localStorage.getItem('test_domain') || 'garba.shop';
-      matched = DOMAIN_CONFIGS[testDomain] || DEFAULT_CONFIG;
-      resolvedDomain = testDomain;
-    }
-
-    setDomainConfig({ domain: resolvedDomain, ...matched });
-  }, []);
+  // useState with initializer function — runs once synchronously before first render
+  const [domainConfig] = useState(resolveConfig);
 
   return (
     <DomainContext.Provider value={domainConfig}>

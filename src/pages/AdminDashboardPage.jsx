@@ -6,6 +6,29 @@ import {
 
 const API = `${import.meta.env.VITE_API_URL}/api/admin`;
 
+/** Authenticated fetch wrapper — injects admin JWT and handles 401 */
+const adminFetch = async (url, options = {}) => {
+  const token = localStorage.getItem("admin_token");
+  const isFormData = options.body instanceof FormData;
+  const headers = {
+    ...(options.headers || {}),
+    Authorization: `Bearer ${token}`,
+  };
+  if (!isFormData && !headers["Content-Type"]) {
+    headers["Content-Type"] = "application/json";
+  }
+  const res = await fetch(url, {
+    ...options,
+    headers,
+  });
+  if (res.status === 401 || res.status === 403) {
+    localStorage.removeItem("admin_token");
+    window.location.href = "/admin-login";
+    return res;
+  }
+  return res;
+};
+
 const STATUS_OPTIONS = ["pending_payment", "confirmed", "packed", "shipped", "delivered", "cancelled"];
 const STATUS_COLORS = {
   pending_payment: "bg-yellow-100 text-yellow-700",
@@ -76,13 +99,14 @@ const ProductsTab = () => {
 
   const load = () => {
     setLoading(true);
-    fetch(`${API}/products`).then(r => r.json()).then(setProducts).finally(() => setLoading(false));
+    adminFetch(`${API}/products`).then(r => r.json()).then(setProducts).finally(() => setLoading(false));
   };
   useEffect(load, []);
 
   const handleDelete = async (id) => {
     if (!confirm("Delete this product?")) return;
-    await fetch(`${API}/products/${id}`, { method: "DELETE" });
+    const res = await adminFetch(`${API}/products/${id}`, { method: "DELETE" });
+    if (!res.ok) { alert("Failed to delete product."); return; }
     load();
   };
 
@@ -121,7 +145,6 @@ const ProductsTab = () => {
     try {
       const url    = editId ? `${API}/products/${editId}` : `${API}/products/add`;
       const method = editId ? "PUT" : "POST";
-
       // Always use FormData so we can attach the image file if selected
       const fd = new FormData();
 
@@ -138,7 +161,7 @@ const ProductsTab = () => {
         fd.append("images", JSON.stringify([]));
       }
 
-      const res = await fetch(url, { method, body: fd });
+      const res = await adminFetch(url, { method, body: fd });
       if (res.ok) {
         setShowForm(false);
         setEditId(null);
@@ -383,15 +406,14 @@ const OrdersTab = () => {
   const load = () => {
     setLoading(true);
     const url = statusFilter ? `${API}/orders?status=${statusFilter}` : `${API}/orders`;
-    fetch(url).then(r => r.json()).then(setOrders).finally(() => setLoading(false));
+    adminFetch(url).then(r => r.json()).then(setOrders).finally(() => setLoading(false));
   };
   useEffect(load, [statusFilter]);
 
   const updateStatus = async (orderId, status, tracking) => {
     setUpdating(orderId);
-    await fetch(`${API}/orders/${orderId}/status`, {
+    await adminFetch(`${API}/orders/${orderId}/status`, {
       method: "PUT",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ status, tracking_number: tracking || undefined })
     });
     setUpdating(null);
@@ -494,16 +516,15 @@ const DiscountsTab = () => {
 
   const load = () => {
     setLoading(true);
-    fetch(`${API}/discount-codes`).then(r => r.json()).then(setCodes).finally(() => setLoading(false));
+    adminFetch(`${API}/discount-codes`).then(r => r.json()).then(setCodes).finally(() => setLoading(false));
   };
   useEffect(load, []);
 
   const handleCreate = async (e) => {
     e.preventDefault();
     setSaving(true); setError("");
-    const res = await fetch(`${API}/discount-codes`, {
+    const res = await adminFetch(`${API}/discount-codes`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         code: form.code,
         discount_percentage: form.discount_percentage ? parseFloat(form.discount_percentage) : null,
@@ -519,13 +540,13 @@ const DiscountsTab = () => {
   };
 
   const toggle = async (id) => {
-    await fetch(`${API}/discount-codes/${id}`, { method: "PUT" });
+    await adminFetch(`${API}/discount-codes/${id}`, { method: "PUT" });
     load();
   };
 
   const del = async (id) => {
     if (!confirm("Delete this code?")) return;
-    await fetch(`${API}/discount-codes/${id}`, { method: "DELETE" });
+    await adminFetch(`${API}/discount-codes/${id}`, { method: "DELETE" });
     load();
   };
 
@@ -611,20 +632,20 @@ const PhotosTab = () => {
 
   const load = () => {
     setLoading(true);
-    fetch(`${API}/photos/pending`).then(r => r.json()).then(setPhotos).finally(() => setLoading(false));
+    adminFetch(`${API}/photos/pending`).then(r => r.json()).then(setPhotos).finally(() => setLoading(false));
   };
   useEffect(load, []);
 
   const approve = async (id) => {
     setActing(id);
-    await fetch(`${API}/photos/${id}/approve`, { method: "POST" });
+    await adminFetch(`${API}/photos/${id}/approve`, { method: "POST" });
     setActing(null);
     load();
   };
 
   const reject = async (id) => {
     setActing(id);
-    await fetch(`${API}/photos/${id}/reject`, { method: "DELETE" });
+    await adminFetch(`${API}/photos/${id}/reject`, { method: "DELETE" });
     setActing(null);
     load();
   };
@@ -690,7 +711,7 @@ const SettingsTab = () => {
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    fetch(`${API}/settings/popup`).then(r => r.json()).then(data => {
+    adminFetch(`${API}/settings/popup`).then(r => r.json()).then(data => {
       setMsg(data.message || "");
       setActive(data.is_active || false);
     });
@@ -698,9 +719,8 @@ const SettingsTab = () => {
 
   const handleSave = async () => {
     setSaving(true);
-    await fetch(`${API}/settings/popup`, {
+    await adminFetch(`${API}/settings/popup`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ message: msg, is_active: active })
     });
     setSaving(false);
