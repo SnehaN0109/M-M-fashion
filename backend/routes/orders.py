@@ -122,7 +122,8 @@ def checkout():
         total_amount=total_amount,
         domain_origin=domain,
         payment_method='COD',
-        status='pending_payment',
+        status='PENDING_PAYMENT',
+        payment_status='PENDING',
         # B2B optional fields
         business_name=data.get('business_name') if b2b else None,
         gst_number=data.get('gst_number') if b2b else None,
@@ -156,6 +157,7 @@ def checkout():
         "order_id": order.id,
         "total_amount": total_amount,
         "status": order.status,
+        "payment_status": order.payment_status,
         "payment_method": order.payment_method
     }), 201
 
@@ -185,6 +187,7 @@ def track_order(order_id):
     return jsonify({
         "order_id": o.id,
         "status": o.status,
+        "payment_status": o.payment_status,
         "tracking_number": o.tracking_number,
         "customer_name": o.customer_name,
         "customer_email": o.customer_email,
@@ -223,6 +226,7 @@ def my_orders():
         result.append({
             "order_id": o.id,
             "status": o.status,
+            "payment_status": o.payment_status,
             "total_amount": o.total_amount,
             "payment_method": o.payment_method,
             "created_at": o.created_at.isoformat(),

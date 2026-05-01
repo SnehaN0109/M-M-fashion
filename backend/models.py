@@ -142,8 +142,9 @@ class Order(db.Model):
     # Meta
     domain_origin = db.Column(db.String(100))
     payment_method = db.Column(db.String(50), default='COD')
-    status = db.Column(db.String(50), default='pending_payment')
-    # Status flow: pending_payment → confirmed → packed → shipped → delivered
+    status = db.Column(db.String(50), default='PENDING_PAYMENT')
+    payment_status = db.Column(db.String(50), default='PENDING')
+    # Status flow: PENDING_PAYMENT → PLACED → PACKED → SHIPPED → OUT_FOR_DELIVERY → DELIVERED
     tracking_number = db.Column(db.String(100), nullable=True)
     # B2B fields (optional — only populated for wholesaler orders)
     business_name = db.Column(db.String(200), nullable=True)

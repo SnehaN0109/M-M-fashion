@@ -3,20 +3,22 @@ import { useParams, Link } from "react-router-dom";
 import { Loader2, Package, CheckCircle, Truck, MapPin, Box, Home } from "lucide-react";
 
 const STATUS_STEPS = [
-  { key: "pending_payment", label: "Order Placed", icon: Package },
-  { key: "confirmed",       label: "Confirmed",    icon: CheckCircle },
-  { key: "packed",          label: "Packed",        icon: Box },
-  { key: "shipped",         label: "Shipped",       icon: Truck },
-  { key: "delivered",       label: "Delivered",     icon: Home },
+  { key: "PENDING_PAYMENT", label: "Pending Payment", icon: Package },
+  { key: "PLACED",          label: "Order Placed",    icon: CheckCircle },
+  { key: "PACKED",          label: "Packed",          icon: Box },
+  { key: "SHIPPED",         label: "Shipped",         icon: Truck },
+  { key: "OUT_FOR_DELIVERY",label: "Out For Delivery",icon: MapPin },
+  { key: "DELIVERED",       label: "Delivered",       icon: Home },
 ];
 
 const STATUS_INDEX = {
-  pending_payment: 0,
-  confirmed: 1,
-  packed: 2,
-  shipped: 3,
-  delivered: 4,
-  cancelled: -1,
+  PENDING_PAYMENT: 0,
+  PLACED: 1,
+  PACKED: 2,
+  SHIPPED: 3,
+  OUT_FOR_DELIVERY: 4,
+  DELIVERED: 5,
+  CANCELLED: -1,
 };
 
 const TrackOrderPage = () => {
@@ -55,8 +57,9 @@ const TrackOrderPage = () => {
 
   if (!order) return null;
 
-  const currentStep = STATUS_INDEX[order.status] ?? 0;
-  const isCancelled = order.status === "cancelled";
+  const normStatus = (order.status || "PENDING_PAYMENT").toUpperCase();
+  const currentStep = STATUS_INDEX[normStatus] ?? 0;
+  const isCancelled = normStatus === "CANCELLED";
 
   return (
     <div className="max-w-2xl mx-auto px-6 py-10">
@@ -69,6 +72,12 @@ const TrackOrderPage = () => {
           Placed on {new Date(order.created_at).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" })}
         </p>
       </div>
+
+      {(order.payment_status || "PENDING").toUpperCase() === "PENDING" && !isCancelled && (
+        <div className="bg-yellow-50 border border-yellow-200 rounded-2xl p-4 mb-6 flex items-center justify-center">
+          <p className="text-sm font-black text-yellow-700">Waiting for payment verification</p>
+        </div>
+      )}
 
       {/* Status Timeline */}
       <div className="bg-white border rounded-2xl p-6 mb-6">
@@ -112,12 +121,12 @@ const TrackOrderPage = () => {
       </div>
 
       {/* Tracking Number */}
-      {order.tracking_number && (
+      {order.tracking_number && currentStep >= STATUS_INDEX["SHIPPED"] && (
         <div className="bg-blue-50 border border-blue-100 rounded-2xl p-5 mb-6 flex items-center gap-3">
           <Truck size={20} className="text-blue-500 flex-shrink-0" />
           <div>
-            <p className="text-xs font-black text-blue-400 uppercase tracking-widest">Tracking Number</p>
-            <p className="font-black text-blue-700 text-lg">{order.tracking_number}</p>
+            <p className="text-xs font-black text-blue-400 uppercase tracking-widest">Shipped via Speed Post</p>
+            <p className="font-black text-blue-700 text-lg">Tracking ID: {order.tracking_number}</p>
           </div>
         </div>
       )}

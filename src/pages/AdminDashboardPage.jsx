@@ -29,22 +29,41 @@ const adminFetch = async (url, options = {}) => {
   return res;
 };
 
-const STATUS_OPTIONS = ["pending_payment", "confirmed", "packed", "shipped", "delivered", "cancelled"];
+const STATUS_OPTIONS = ["PENDING_PAYMENT", "PLACED", "PACKED", "SHIPPED", "OUT_FOR_DELIVERY", "DELIVERED", "CANCELLED"];
+const PAYMENT_STATUS_OPTIONS = ["PENDING", "VERIFIED", "FAILED"];
 const STATUS_COLORS = {
-  pending_payment: "bg-yellow-100 text-yellow-700",
-  confirmed: "bg-blue-100 text-blue-700",
-  packed: "bg-indigo-100 text-indigo-700",
-  shipped: "bg-purple-100 text-purple-700",
-  delivered: "bg-green-100 text-green-700",
-  cancelled: "bg-red-100 text-red-700",
+  PENDING_PAYMENT: "bg-yellow-100 text-yellow-700",
+  PLACED: "bg-blue-100 text-blue-700",
+  PACKED: "bg-indigo-100 text-indigo-700",
+  SHIPPED: "bg-purple-100 text-purple-700",
+  OUT_FOR_DELIVERY: "bg-blue-100 text-blue-700",
+  DELIVERED: "bg-green-100 text-green-700",
+  CANCELLED: "bg-red-100 text-red-700",
+};
+const PAYMENT_COLORS = {
+  PENDING: "bg-yellow-100 text-yellow-700",
+  VERIFIED: "bg-green-100 text-green-700",
+  FAILED: "bg-red-100 text-red-700",
 };
 
 // ─── Reusable ────────────────────────────────────────────────────────────────
-const Badge = ({ status }) => (
-  <span className={`text-xs font-black px-2 py-0.5 rounded-full capitalize ${STATUS_COLORS[status] || "bg-gray-100 text-gray-600"}`}>
-    {status?.replace(/_/g, " ")}
-  </span>
-);
+const Badge = ({ status }) => {
+  const normStatus = (status || "PENDING_PAYMENT").toUpperCase();
+  return (
+    <span className={`text-xs font-black px-2 py-0.5 rounded-full capitalize ${STATUS_COLORS[normStatus] || "bg-gray-100 text-gray-600"}`}>
+      {normStatus.replace(/_/g, " ")}
+    </span>
+  );
+};
+
+const PaymentBadge = ({ status }) => {
+  const normStatus = (status || "PENDING").toUpperCase();
+  return (
+    <span className={`text-xs font-black px-2 py-0.5 rounded-full capitalize ${PAYMENT_COLORS[normStatus] || "bg-gray-100 text-gray-600"}`}>
+      {normStatus}
+    </span>
+  );
+};
 
 const EMPTY_FORM = {
   name: "", description: "", category: "", fabric: "",
@@ -410,11 +429,11 @@ const OrdersTab = () => {
   };
   useEffect(load, [statusFilter]);
 
-  const updateStatus = async (orderId, status, tracking) => {
+  const updateStatus = async (orderId, status, paymentStatus, tracking) => {
     setUpdating(orderId);
     await adminFetch(`${API}/orders/${orderId}/status`, {
       method: "PUT",
-      body: JSON.stringify({ status, tracking_number: tracking || undefined })
+      body: JSON.stringify({ status, payment_status: paymentStatus, tracking_number: tracking || undefined })
     });
     setUpdating(null);
     load();
@@ -450,7 +469,8 @@ const OrdersTab = () => {
 
 const OrderRow = ({ order, updating, onUpdate }) => {
   const [open, setOpen] = useState(false);
-  const [newStatus, setNewStatus] = useState(order.status);
+  const [newStatus, setNewStatus] = useState((order.status || "PENDING_PAYMENT").toUpperCase());
+  const [newPaymentStatus, setNewPaymentStatus] = useState((order.payment_status || "PENDING").toUpperCase());
   const [tracking, setTracking] = useState(order.tracking_number || "");
 
   return (
@@ -461,6 +481,7 @@ const OrderRow = ({ order, updating, onUpdate }) => {
           <span className="text-sm text-gray-600">{order.customer_name}</span>
           <span className="text-sm text-gray-400">{order.customer_phone}</span>
           <Badge status={order.status} />
+          <PaymentBadge status={order.payment_status} />
         </div>
         <div className="flex items-center gap-4">
           <span className="font-black text-gray-900">₹{order.total_amount?.toLocaleString()}</span>
@@ -487,13 +508,20 @@ const OrderRow = ({ order, updating, onUpdate }) => {
               </select>
             </div>
             <div>
+              <label className="text-xs font-black text-gray-400 uppercase tracking-widest block mb-1">Payment Status</label>
+              <select value={newPaymentStatus} onChange={e => setNewPaymentStatus(e.target.value)}
+                className="border rounded-xl px-3 py-2 text-sm focus:outline-none">
+                {PAYMENT_STATUS_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </div>
+            <div>
               <label className="text-xs font-black text-gray-400 uppercase tracking-widest block mb-1">Tracking Number</label>
               <input value={tracking} onChange={e => setTracking(e.target.value)}
                 placeholder="e.g. DTDC123456"
                 className="border rounded-xl px-3 py-2 text-sm focus:outline-none w-48" />
             </div>
             <button
-              onClick={() => onUpdate(order.id, newStatus, tracking)}
+              onClick={() => onUpdate(order.id, newStatus, newPaymentStatus, tracking)}
               disabled={updating === order.id}
               className="px-5 py-2 bg-gray-900 text-white font-bold rounded-xl text-sm disabled:opacity-50 flex items-center gap-2"
             >

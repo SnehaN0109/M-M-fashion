@@ -248,15 +248,27 @@ def list_orders():
 def update_order_status(order_id):
     o = Order.query.get_or_404(order_id)
     data = request.json
-    valid_statuses = ['pending_payment', 'confirmed', 'packed', 'shipped', 'delivered', 'cancelled']
+    valid_statuses = ['PENDING_PAYMENT', 'PLACED', 'PACKED', 'SHIPPED', 'OUT_FOR_DELIVERY', 'DELIVERED', 'CANCELLED']
+    valid_payment_statuses = ['PENDING', 'VERIFIED', 'FAILED']
+    
     new_status = data.get('status')
-    if new_status not in valid_statuses:
+    new_payment_status = data.get('payment_status')
+    
+    if new_status and new_status not in valid_statuses:
         return jsonify({"error": f"Invalid status. Must be one of {valid_statuses}"}), 400
-    o.status = new_status
-    if data.get('tracking_number'):
+    if new_payment_status and new_payment_status not in valid_payment_statuses:
+        return jsonify({"error": f"Invalid payment_status. Must be one of {valid_payment_statuses}"}), 400
+        
+    if new_status:
+        o.status = new_status
+    if new_payment_status:
+        o.payment_status = new_payment_status
+        
+    if data.get('tracking_number') is not None:
         o.tracking_number = data.get('tracking_number')
+        
     db.session.commit()
-    return jsonify({"message": "Order status updated", "status": o.status})
+    return jsonify({"message": "Order status updated", "status": o.status, "payment_status": o.payment_status})
 
 
 # ─── Discount Codes ───────────────────────────────────────────────────────────
