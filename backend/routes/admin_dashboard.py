@@ -1,6 +1,22 @@
-from flask import Blueprint, jsonify, request
+import os
+import uuid
+from flask import Blueprint, jsonify, request, current_app
+from werkzeug.utils import secure_filename
 from models import db, Product, ProductVariant, ProductImage, UserPhoto, DiscountCode, Order, SiteSetting
-from flask import current_app
+
+# ─── Upload helpers ────────────────────────────────────────────────────────────
+PRODUCT_UPLOAD_FOLDER = os.path.join(os.path.dirname(__file__), '..', 'uploads', 'products')
+ALLOWED_EXTENSIONS    = {'jpg', 'jpeg', 'png', 'webp'}
+
+def _allowed(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+def _save_image(file):
+    os.makedirs(PRODUCT_UPLOAD_FOLDER, exist_ok=True)
+    ext = file.filename.rsplit('.', 1)[1].lower()
+    fname = f"{uuid.uuid4().hex}.{ext}"
+    file.save(os.path.join(PRODUCT_UPLOAD_FOLDER, fname))
+    return f"/uploads/products/{fname}"
 
 admin_bp = Blueprint('admin', __name__)
 
@@ -40,11 +56,28 @@ def list_products():
 
 @admin_bp.route('/products/add', methods=['POST'])
 def add_product():
-    data = request.json
+    # Support both multipart/form-data (file upload) and application/json
+    is_multipart = request.content_type and 'multipart/form-data' in request.content_type
+
+    if is_multipart:
+        data = request.form
+    else:
+        data = request.json or {}
+
     name = data.get('name')
     if not name:
         return jsonify({"error": "Product name is required"}), 400
 
+    # ── Handle image upload ──────────────────────────────────────────────────
+    image_url = data.get('image_url', '')
+    if is_multipart and 'image' in request.files:
+        file = request.files['image']
+        if file and file.filename and _allowed(file.filename):
+            image_url = _save_image(file)
+        elif file and file.filename:
+            return jsonify({"error": "Invalid image type. Allowed: jpg, jpeg, png, webp"}), 400
+
+    import json
     p = Product(
         name=name,
         description=data.get('description'),
@@ -53,14 +86,16 @@ def add_product():
         occasion=data.get('occasion'),
         pattern=data.get('pattern'),
         gender=data.get('gender'),
-        image_url=data.get('image_url'),
+        image_url=image_url or None,
         video_url=data.get('video_url')
     )
     db.session.add(p)
-    db.session.flush()  # get p.id before commit
+    db.session.flush()
 
-    # Add variants
-    for v in data.get('variants', []):
+    # ── Variants ─────────────────────────────────────────────────────────────
+    variants_raw = data.get('variants', '[]')
+    variants = variants_raw if isinstance(variants_raw, list) else json.loads(variants_raw)
+    for v in variants:
         pv = ProductVariant(
             product_id=p.id,
             design_id=v.get('design_id'),
@@ -73,8 +108,10 @@ def add_product():
         )
         db.session.add(pv)
 
-    # Add extra images
-    for idx, img_url in enumerate(data.get('images', [])):
+    # ── Extra images ──────────────────────────────────────────────────────────
+    images_raw = data.get('images', '[]')
+    images = images_raw if isinstance(images_raw, list) else json.loads(images_raw)
+    for idx, img_url in enumerate(images):
         pi = ProductImage(
             product_id=p.id,
             image_url=img_url,
@@ -90,17 +127,28 @@ def add_product():
 @admin_bp.route('/products/<int:product_id>', methods=['PUT'])
 def edit_product(product_id):
     p = Product.query.get_or_404(product_id)
-    data = request.json
 
-    p.name = data.get('name', p.name)
+    is_multipart = request.content_type and 'multipart/form-data' in request.content_type
+    data = request.form if is_multipart else (request.json or {})
+
+    p.name        = data.get('name', p.name)
     p.description = data.get('description', p.description)
-    p.category = data.get('category', p.category)
-    p.fabric = data.get('fabric', p.fabric)
-    p.occasion = data.get('occasion', p.occasion)
-    p.pattern = data.get('pattern', p.pattern)
-    p.gender = data.get('gender', p.gender)
-    p.image_url = data.get('image_url', p.image_url)
-    p.video_url = data.get('video_url', p.video_url)
+    p.category    = data.get('category', p.category)
+    p.fabric      = data.get('fabric', p.fabric)
+    p.occasion    = data.get('occasion', p.occasion)
+    p.pattern     = data.get('pattern', p.pattern)
+    p.gender      = data.get('gender', p.gender)
+    p.video_url   = data.get('video_url', p.video_url)
+
+    # Only replace image_url if a new file was uploaded
+    if is_multipart and 'image' in request.files:
+        file = request.files['image']
+        if file and file.filename and _allowed(file.filename):
+            p.image_url = _save_image(file)
+        elif file and file.filename:
+            return jsonify({"error": "Invalid image type. Allowed: jpg, jpeg, png, webp"}), 400
+    elif not is_multipart and 'image_url' in data:
+        p.image_url = data.get('image_url', p.image_url)
 
     db.session.commit()
     return jsonify({"message": "Product updated"})

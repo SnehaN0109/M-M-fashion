@@ -57,15 +57,25 @@ const ProductCard = ({ product }) => {
 
         {/* Media Container */}
         <div className="h-[300px] overflow-hidden bg-gray-50 relative rounded-t-2xl">
-          <img
-            src={product.images?.[0] || product.image_url || "https://via.placeholder.com/300x400?text=Product"}
-            alt={product.name}
-            className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
-            onError={(e) => {
-              e.target.onerror = null;
-              e.target.src = "https://via.placeholder.com/300x400?text=No+Image";
-            }}
-          />
+          {(() => {
+            const raw = product.images?.[0] || product.image_url || "";
+            const src = raw.startsWith("http")
+              ? raw
+              : raw
+              ? `${import.meta.env.VITE_API_URL}${raw}`
+              : "https://via.placeholder.com/300x400?text=Product";
+            return (
+              <img
+                src={src}
+                alt={product.name}
+                className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                onError={(e) => {
+                  e.target.onerror = null;
+                  e.target.src = "https://via.placeholder.com/300x400?text=No+Image";
+                }}
+              />
+            );
+          })()}
           {/* Glass Overlay on hover */}
           <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
           

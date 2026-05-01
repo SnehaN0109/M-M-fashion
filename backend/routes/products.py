@@ -1,10 +1,26 @@
 import os
 import uuid
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify, request, current_app
 from werkzeug.utils import secure_filename
 from models import db, Product, ProductVariant, Review, UserPhoto, User, SiteSetting
 
 products_bp = Blueprint('products', __name__)
+
+# ─── Upload helpers ───────────────────────────────────────────────────────────
+PRODUCT_UPLOAD_FOLDER = os.path.join(os.path.dirname(__file__), '..', 'uploads', 'products')
+USER_PHOTO_FOLDER     = os.path.join(os.path.dirname(__file__), '..', 'uploads', 'photos')
+ALLOWED_EXTENSIONS    = {'jpg', 'jpeg', 'png', 'webp'}
+
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+def save_product_image(file):
+    """Save uploaded image to uploads/products/ and return the relative URL path."""
+    os.makedirs(PRODUCT_UPLOAD_FOLDER, exist_ok=True)
+    ext      = file.filename.rsplit('.', 1)[1].lower()
+    filename = f"{uuid.uuid4().hex}.{ext}"
+    file.save(os.path.join(PRODUCT_UPLOAD_FOLDER, filename))
+    return f"/uploads/products/{filename}"
 
 @products_bp.route('/', methods=['GET'], strict_slashes=False)
 def get_products():

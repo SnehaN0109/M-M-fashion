@@ -73,6 +73,7 @@ function App() {
 
         {/* ===== Authentication ===== */}
         <Route path="/login" element={<WhatsAppLoginPage />} />
+        <Route path="/whatsapp-login" element={<WhatsAppLoginPage />} />
 
         {/* ===== Upload Photos ===== */}
         <Route path="/upload-photos" element={<UploadUserPhotosPage />} />

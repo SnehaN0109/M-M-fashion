@@ -35,6 +35,13 @@ const EMPTY_FORM = {
   price_b2b_maharashtra: 0,
 };
 
+/** Resolve image src — handles both old external URLs and new /uploads/... paths */
+const resolveImageSrc = (url) => {
+  if (!url) return null;
+  if (url.startsWith('http')) return url;           // old external URL
+  return `${import.meta.env.VITE_API_URL}${url}`;  // local upload path
+};
+
 /** Expand colours × sizes into individual variant rows */
 const buildVariants = (form) => {
   const colors = form.colors.split(",").map(c => c.trim()).filter(Boolean);
@@ -61,9 +68,11 @@ const ProductsTab = () => {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
-  const [editId, setEditId] = useState(null); // null = add mode, number = edit mode
+  const [editId, setEditId] = useState(null);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState(EMPTY_FORM);
+  const [imageFile, setImageFile] = useState(null);   // File object for upload
+  const [imagePreview, setImagePreview] = useState(null); // data URL preview
 
   const load = () => {
     setLoading(true);
@@ -92,6 +101,8 @@ const ProductsTab = () => {
       colors: "", sizes: "", quantity: 10,
       price_b2c: 0, price_b2b_ttd: 0, price_b2b_maharashtra: 0,
     });
+    setImageFile(null);
+    setImagePreview(p.image_url ? resolveImageSrc(p.image_url) : null);
     setShowForm(true);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
@@ -99,6 +110,8 @@ const ProductsTab = () => {
   const handleAddNew = () => {
     setEditId(null);
     setForm(EMPTY_FORM);
+    setImageFile(null);
+    setImagePreview(null);
     setShowForm(true);
   };
 
@@ -106,17 +119,34 @@ const ProductsTab = () => {
     e.preventDefault();
     setSaving(true);
     try {
-      const url = editId ? `${API}/products/${editId}` : `${API}/products/add`;
+      const url    = editId ? `${API}/products/${editId}` : `${API}/products/add`;
       const method = editId ? "PUT" : "POST";
-      const payload = editId
-        ? form  // edit only updates product fields, not variants
-        : { ...form, variants: buildVariants(form) };
-      const res = await fetch(url, {
-        method,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
-      });
-      if (res.ok) { setShowForm(false); setEditId(null); setForm(EMPTY_FORM); load(); }
+
+      // Always use FormData so we can attach the image file if selected
+      const fd = new FormData();
+
+      // Append all text fields
+      const textFields = ["name","description","category","fabric","occasion","pattern","gender","video_url","image_url"];
+      textFields.forEach(k => fd.append(k, form[k] ?? ""));
+
+      // Append image file if one was selected
+      if (imageFile) fd.append("image", imageFile);
+
+      // For new products, append variants as JSON string
+      if (!editId) {
+        fd.append("variants", JSON.stringify(buildVariants(form)));
+        fd.append("images", JSON.stringify([]));
+      }
+
+      const res = await fetch(url, { method, body: fd });
+      if (res.ok) {
+        setShowForm(false);
+        setEditId(null);
+        setForm(EMPTY_FORM);
+        setImageFile(null);
+        setImagePreview(null);
+        load();
+      }
     } finally { setSaving(false); }
   };
 
@@ -134,7 +164,7 @@ const ProductsTab = () => {
         <form onSubmit={handleSubmit} className="border rounded-2xl p-6 mb-8 space-y-4 bg-gray-50">
           <h3 className="font-black text-lg">{editId ? `Edit Product #${editId}` : "New Product"}</h3>
           <div className="grid grid-cols-2 gap-4">
-            {["name", "category", "fabric", "occasion", "pattern", "gender", "image_url", "video_url"].map(field => (
+            {["name", "category", "fabric", "occasion", "pattern", "gender", "video_url"].map(field => (
               <div key={field}>
                 <label className="text-xs font-black text-gray-400 uppercase tracking-widest block mb-1">{field.replace(/_/g, " ")}</label>
                 <input value={form[field]} onChange={e => setForm(f => ({ ...f, [field]: e.target.value }))}
@@ -142,6 +172,59 @@ const ProductsTab = () => {
                   required={field === "name"} />
               </div>
             ))}
+
+            {/* ── Image Upload ── */}
+            <div className="col-span-2">
+              <label className="text-xs font-black text-gray-400 uppercase tracking-widest block mb-1">Product Image</label>
+              <div className="flex items-start gap-4">
+                {/* File picker */}
+                <label className="flex-1 flex flex-col items-center justify-center border-2 border-dashed border-gray-200 rounded-xl p-4 cursor-pointer hover:border-pink-400 hover:bg-pink-50 transition">
+                  <input
+                    id="product-image-input"
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    className="hidden"
+                    onChange={e => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      setImageFile(file);
+                      setImagePreview(URL.createObjectURL(file));
+                    }}
+                  />
+                  <span className="text-xs font-bold text-gray-500 text-center">
+                    {imageFile ? imageFile.name : "Click to upload JPG / PNG / WEBP"}
+                  </span>
+                  {!imageFile && (
+                    <span className="text-[10px] text-gray-400 mt-1">Or leave blank to use URL below</span>
+                  )}
+                </label>
+
+                {/* Live preview */}
+                {imagePreview && (
+                  <div className="relative w-24 h-24 rounded-xl overflow-hidden border flex-shrink-0">
+                    <img src={imagePreview} alt="preview" className="w-full h-full object-cover" />
+                    <button
+                      type="button"
+                      onClick={() => { setImageFile(null); setImagePreview(form.image_url ? resolveImageSrc(form.image_url) : null); }}
+                      className="absolute top-1 right-1 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs font-black"
+                    >×</button>
+                  </div>
+                )}
+              </div>
+
+              {/* Fallback URL input (backward compat) */}
+              {!imageFile && (
+                <div className="mt-2">
+                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-1">Or paste image URL (old products)</label>
+                  <input
+                    value={form.image_url}
+                    onChange={e => { setForm(f => ({ ...f, image_url: e.target.value })); setImagePreview(e.target.value || null); }}
+                    placeholder="https://..."
+                    className="w-full border rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-pink-500"
+                  />
+                </div>
+              )}
+            </div>
           </div>
           <div>
             <label className="text-xs font-black text-gray-400 uppercase tracking-widest block mb-1">Description</label>
@@ -253,7 +336,13 @@ const ProductsTab = () => {
                 <tr key={p.id} className="border-b hover:bg-gray-50">
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
-                      {p.image_url && <img src={p.image_url} alt="" className="w-10 h-10 rounded-lg object-cover" />}
+                      {p.image_url && (
+                        <img
+                          src={resolveImageSrc(p.image_url)}
+                          alt=""
+                          className="w-10 h-10 rounded-lg object-cover"
+                        />
+                      )}
                       <div>
                         <p className="font-bold text-gray-900">{p.name}</p>
                         <p className="text-xs text-gray-400">ID: {p.id}</p>

@@ -44,6 +44,11 @@ def create_app():
         upload_dir = os.path.join(os.path.dirname(__file__), 'uploads', 'photos')
         return send_from_directory(upload_dir, filename)
 
+    @app.route("/uploads/products/<path:filename>")
+    def serve_product_image(filename):
+        upload_dir = os.path.join(os.path.dirname(__file__), 'uploads', 'products')
+        return send_from_directory(upload_dir, filename)
+
     @app.route("/api/test-db")
     def test_db():
         try:

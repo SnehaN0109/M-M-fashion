@@ -1,8 +1,10 @@
 import os
+from pathlib import Path
 from sqlalchemy.engine import URL
 from dotenv import load_dotenv
 
-load_dotenv()
+# Load .env from the backend directory regardless of where python is launched from
+load_dotenv(dotenv_path=Path(__file__).resolve().parent / ".env")
 
 class Config:
     SQLALCHEMY_DATABASE_URI = URL.create(
@@ -16,3 +18,9 @@ class Config:
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     SECRET_KEY = os.getenv("SECRET_KEY", "dev-secret-key")
     ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "admin123")
+    # Aiven cloud MySQL requires SSL
+    SQLALCHEMY_ENGINE_OPTIONS = {
+        "connect_args": {
+            "ssl": {}
+        }
+    }
