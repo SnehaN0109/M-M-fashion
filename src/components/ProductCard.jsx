@@ -2,10 +2,12 @@ import { useNavigate } from "react-router-dom";
 import { useContext, useState } from "react";
 import { FaHeart, FaRegHeart } from "react-icons/fa";
 import { WishlistContext } from "../context/WishlistContext";
+import { CartContext } from "../context/CartContext";
 
 const ProductCard = ({ product }) => {
   const navigate = useNavigate();
   const { wishlist, addToWishlist, removeFromWishlist } = useContext(WishlistContext);
+  const { addToCart } = useContext(CartContext);
   const [showMessage, setShowMessage] = useState(false);
 
   const isLiked = wishlist.some((item) => item.id === product.id);
@@ -54,11 +56,15 @@ const ProductCard = ({ product }) => {
         )}
 
         {/* Media Container */}
-        <div className="aspect-[3/4] overflow-hidden bg-gray-50 relative">
+        <div className="h-[300px] overflow-hidden bg-gray-50 relative rounded-t-2xl">
           <img
-            src={product.image_url || "https://via.placeholder.com/400x533?text=Product"}
+            src={product.images?.[0] || product.image_url || "https://via.placeholder.com/300x400?text=Product"}
             alt={product.name}
             className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+            onError={(e) => {
+              e.target.onerror = null;
+              e.target.src = "https://via.placeholder.com/300x400?text=No+Image";
+            }}
           />
           {/* Glass Overlay on hover */}
           <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
@@ -104,17 +110,21 @@ const ProductCard = ({ product }) => {
                </p>
             </div>
             
-            {/* Color preview icons */}
-            <div className="flex -space-x-1.5 overflow-hidden">
-               {uniqueColors.slice(0, 3).map((c, i) => (
-                 <div 
-                   key={i} 
-                   className="w-4 h-4 rounded-full border-2 border-white shadow-sm"
-                   style={{ backgroundColor: c.toLowerCase() }}
-                   title={c}
-                 />
-               ))}
-            </div>
+            {/* Quick Add Button */}
+            <button
+               onClick={(e) => {
+                 e.stopPropagation();
+                 const firstVar = product.variants?.[0];
+                 if (firstVar) {
+                   addToCart({ ...product, activeVariant: firstVar, price: firstVar.price });
+                   setShowMessage(true);
+                   setTimeout(() => setShowMessage(false), 2000);
+                 }
+               }}
+               className="bg-pink-600 text-white p-3 rounded-xl shadow-lg hover:bg-black transition-all active:scale-90 flex items-center justify-center"
+            >
+               <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="8" cy="21" r="1"/><circle cx="19" cy="21" r="1"/><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"/></svg>
+            </button>
           </div>
         </div>
       </div>

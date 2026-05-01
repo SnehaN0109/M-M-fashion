@@ -1,7 +1,7 @@
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 
 /* ===== Layout Components ===== */
-import Header from "./components/Header";
+import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
 
 /* ===== Pages ===== */
@@ -29,7 +29,7 @@ import PrivacyPolicyPage from "./pages/PrivacyPolicyPage";
 function App() {
   return (
     <Router>
-      <Header />
+      <Navbar />
 
       <Routes>
 

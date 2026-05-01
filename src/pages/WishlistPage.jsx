@@ -9,7 +9,6 @@ const WishlistPage = () => {
 
   return (
     <div className="bg-[#fafafa] min-h-screen pb-20">
-      {/* Header */}
       <div className="bg-white pt-16 pb-20 border-b border-gray-100 mb-12">
         <div className="max-w-7xl mx-auto px-6 text-center">
            <span className="text-xs font-black text-pink-600 uppercase tracking-widest mb-4 block">Your Collection</span>
