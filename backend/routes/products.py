@@ -3,12 +3,13 @@ import uuid
 from flask import Blueprint, jsonify, request
 from werkzeug.utils import secure_filename
 from models import db, Product, ProductVariant, Review, UserPhoto, User, SiteSetting
+from utils import resolve_price_key
 
 products_bp = Blueprint('products', __name__)
 
 @products_bp.route('/', methods=['GET'], strict_slashes=False)
 def get_products():
-    domain = request.args.get('domain')
+    domain = request.args.get('domain', 'garba.shop')
     category = request.args.get('category')
     size = request.args.get('size')
     color = request.args.get('color')
@@ -16,10 +17,8 @@ def get_products():
     max_price = request.args.get('max_price', type=float)
     search = request.args.get('search')
 
-    VALID_PRICE_KEYS = {'price_b2c', 'price_b2b_ttd', 'price_b2b_maharashtra'}
-    price_key = request.args.get('price_key', 'price_b2c')
-    if price_key not in VALID_PRICE_KEYS:
-        price_key = 'price_b2c'
+    # Resolve price_key server-side from domain — never trust client-provided price_key
+    price_key = resolve_price_key(domain)
 
     query = Product.query
 
@@ -81,10 +80,10 @@ def get_products():
 
 @products_bp.route('/<int:product_id>', methods=['GET'], strict_slashes=False)
 def get_product(product_id):
-    VALID_PRICE_KEYS = {'price_b2c', 'price_b2b_ttd', 'price_b2b_maharashtra'}
-    price_key = request.args.get('price_key', 'price_b2c')
-    if price_key not in VALID_PRICE_KEYS:
-        price_key = 'price_b2c'
+    domain = request.args.get('domain', 'garba.shop')
+
+    # Resolve price_key server-side from domain — never trust client-provided price_key
+    price_key = resolve_price_key(domain)
 
     p = Product.query.get_or_404(product_id)
 

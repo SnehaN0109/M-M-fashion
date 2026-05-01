@@ -1,8 +1,36 @@
-from flask import Blueprint, jsonify, request
-from models import db, Product, ProductVariant, ProductImage, UserPhoto, DiscountCode, Order, SiteSetting
-from flask import current_app
+from flask import Blueprint, jsonify, request, current_app
+from functools import wraps
+import jwt as pyjwt
+import datetime
+from models import db, Product, ProductVariant, ProductImage, UserPhoto, DiscountCode, Order, SiteSetting, User
 
 admin_bp = Blueprint('admin', __name__)
+
+
+# ─── Auth decorator ───────────────────────────────────────────────────────────
+
+def admin_required(f):
+    """Verify JWT admin token on every protected admin route."""
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        auth_header = request.headers.get('Authorization', '')
+        if not auth_header.startswith('Bearer '):
+            return jsonify({"error": "Missing or invalid Authorization header"}), 401
+        token = auth_header.split(' ', 1)[1]
+        try:
+            payload = pyjwt.decode(
+                token,
+                current_app.config['SECRET_KEY'],
+                algorithms=['HS256']
+            )
+            if payload.get('role') != 'admin':
+                return jsonify({"error": "Admin access required"}), 403
+        except pyjwt.ExpiredSignatureError:
+            return jsonify({"error": "Session expired. Please log in again."}), 401
+        except pyjwt.InvalidTokenError:
+            return jsonify({"error": "Invalid token"}), 401
+        return f(*args, **kwargs)
+    return decorated
 
 
 # ─── Auth ─────────────────────────────────────────────────────────────────────
@@ -11,14 +39,24 @@ admin_bp = Blueprint('admin', __name__)
 def admin_login():
     data = request.json or {}
     password = data.get('password', '')
-    if password == current_app.config.get('ADMIN_PASSWORD'):
-        return jsonify({"success": True, "token": "admin-authenticated"})
-    return jsonify({"error": "Invalid password"}), 401
+    if password != current_app.config.get('ADMIN_PASSWORD'):
+        return jsonify({"error": "Invalid password"}), 401
+
+    token = pyjwt.encode(
+        {
+            "role": "admin",
+            "exp": datetime.datetime.utcnow() + datetime.timedelta(hours=24)
+        },
+        current_app.config['SECRET_KEY'],
+        algorithm='HS256'
+    )
+    return jsonify({"success": True, "token": token})
 
 
 # ─── Products ────────────────────────────────────────────────────────────────
 
 @admin_bp.route('/products', methods=['GET'])
+@admin_required
 def list_products():
     products = Product.query.order_by(Product.created_at.desc()).all()
     result = []
@@ -39,6 +77,7 @@ def list_products():
 
 
 @admin_bp.route('/products/add', methods=['POST'])
+@admin_required
 def add_product():
     data = request.json
     name = data.get('name')
@@ -88,6 +127,7 @@ def add_product():
 
 
 @admin_bp.route('/products/<int:product_id>', methods=['PUT'])
+@admin_required
 def edit_product(product_id):
     p = Product.query.get_or_404(product_id)
     data = request.json
@@ -107,6 +147,7 @@ def edit_product(product_id):
 
 
 @admin_bp.route('/products/<int:product_id>', methods=['DELETE'])
+@admin_required
 def delete_product(product_id):
     p = Product.query.get_or_404(product_id)
     db.session.delete(p)
@@ -117,11 +158,15 @@ def delete_product(product_id):
 # ─── Orders ──────────────────────────────────────────────────────────────────
 
 @admin_bp.route('/orders', methods=['GET'])
+@admin_required
 def list_orders():
     status_filter = request.args.get('status')
+    domain_filter = request.args.get('domain')   # e.g. ?domain=ttd.in
     query = Order.query.order_by(Order.created_at.desc())
     if status_filter:
         query = query.filter_by(status=status_filter)
+    if domain_filter:
+        query = query.filter(Order.domain_origin.ilike(f"%{domain_filter}%"))
     orders = query.all()
     result = []
     for o in orders:
@@ -135,6 +180,8 @@ def list_orders():
             "payment_method": o.payment_method,
             "domain_origin": o.domain_origin,
             "tracking_number": o.tracking_number,
+            "business_name": o.business_name,
+            "gst_number": o.gst_number,
             "created_at": o.created_at.isoformat(),
             "items": [
                 {
@@ -148,6 +195,7 @@ def list_orders():
 
 
 @admin_bp.route('/orders/<int:order_id>/status', methods=['PUT'])
+@admin_required
 def update_order_status(order_id):
     o = Order.query.get_or_404(order_id)
     data = request.json
@@ -165,6 +213,7 @@ def update_order_status(order_id):
 # ─── Discount Codes ───────────────────────────────────────────────────────────
 
 @admin_bp.route('/discount-codes', methods=['GET'])
+@admin_required
 def get_discounts():
     codes = DiscountCode.query.order_by(DiscountCode.created_at.desc()).all()
     return jsonify([{
@@ -178,6 +227,7 @@ def get_discounts():
 
 
 @admin_bp.route('/discount-codes', methods=['POST'])
+@admin_required
 def create_discount():
     data = request.json
     if not data.get('code'):
@@ -196,6 +246,7 @@ def create_discount():
 
 
 @admin_bp.route('/discount-codes/<int:code_id>', methods=['PUT'])
+@admin_required
 def toggle_discount(code_id):
     code = DiscountCode.query.get_or_404(code_id)
     code.is_active = not code.is_active
@@ -204,6 +255,7 @@ def toggle_discount(code_id):
 
 
 @admin_bp.route('/discount-codes/<int:code_id>', methods=['DELETE'])
+@admin_required
 def delete_discount(code_id):
     code = DiscountCode.query.get_or_404(code_id)
     db.session.delete(code)
@@ -214,6 +266,7 @@ def delete_discount(code_id):
 # ─── User Photos (moderation) ─────────────────────────────────────────────────
 
 @admin_bp.route('/photos/pending', methods=['GET'])
+@admin_required
 def pending_photos():
     photos = UserPhoto.query.filter_by(is_approved=False).all()
     return jsonify([{
@@ -226,6 +279,7 @@ def pending_photos():
 
 
 @admin_bp.route('/photos/<int:photo_id>/approve', methods=['POST'])
+@admin_required
 def approve_photo(photo_id):
     photo = UserPhoto.query.get_or_404(photo_id)
     photo.is_approved = True
@@ -234,6 +288,7 @@ def approve_photo(photo_id):
 
 
 @admin_bp.route('/photos/<int:photo_id>/reject', methods=['DELETE'])
+@admin_required
 def reject_photo(photo_id):
     photo = UserPhoto.query.get_or_404(photo_id)
     db.session.delete(photo)
@@ -244,6 +299,7 @@ def reject_photo(photo_id):
 # ─── Site Settings ───────────────────────────────────────────────────────────
 
 @admin_bp.route('/settings/popup', methods=['GET'], strict_slashes=False)
+@admin_required
 def get_popup_setting():
     setting = SiteSetting.query.filter_by(key='welcome_popup').first()
     if not setting:
@@ -251,6 +307,7 @@ def get_popup_setting():
     return jsonify({"message": setting.value, "is_active": setting.is_active})
 
 @admin_bp.route('/settings/popup', methods=['POST', 'PUT'], strict_slashes=False)
+@admin_required
 def update_popup_setting():
     data = request.json
     setting = SiteSetting.query.filter_by(key='welcome_popup').first()
@@ -263,3 +320,34 @@ def update_popup_setting():
             setting.is_active = data['is_active']
     db.session.commit()
     return jsonify({"success": True})
+
+
+# ─── User Role Management (B2B wholesaler control) ────────────────────────────
+
+@admin_bp.route('/users', methods=['GET'])
+@admin_required
+def list_users():
+    """List all users with their roles."""
+    users = User.query.order_by(User.created_at.desc()).all()
+    return jsonify([{
+        "id": u.id,
+        "whatsapp_number": u.whatsapp_number,
+        "name": u.name,
+        "email": u.email,
+        "role": u.role or 'B2C',
+        "created_at": u.created_at.isoformat()
+    } for u in users])
+
+
+@admin_bp.route('/users/<int:user_id>/role', methods=['PUT'])
+@admin_required
+def set_user_role(user_id):
+    """Promote or demote a user between B2C and WHOLESALER."""
+    user = User.query.get_or_404(user_id)
+    data = request.json or {}
+    new_role = data.get('role', '').upper()
+    if new_role not in ('B2C', 'WHOLESALER'):
+        return jsonify({"error": "role must be 'B2C' or 'WHOLESALER'"}), 400
+    user.role = new_role
+    db.session.commit()
+    return jsonify({"message": f"User role updated to {new_role}", "user_id": user_id, "role": new_role})

@@ -27,7 +27,7 @@ const TrackOrderPage = () => {
 
   useEffect(() => {
     if (!orderId) return;
-    fetch(`http://localhost:5000/api/orders/track/${orderId}`)
+    fetch(`${import.meta.env.VITE_API_URL}/api/orders/track/${orderId}`)
       .then((r) => {
         if (!r.ok) throw new Error("Order not found.");
         return r.json();

@@ -36,7 +36,20 @@ export const CartProvider = ({ children }) => {
 
   const whatsapp = () => localStorage.getItem("whatsapp_number");
   const priceKey = () => {
-    const d = localStorage.getItem("test_domain") || "garba.shop";
+    const hostname = window.location.hostname;
+    let d = "garba.shop"; // default
+
+    if (hostname.includes('ttd.in')) {
+      d = 'ttd.in';
+    } else if (hostname.includes('garba.shop')) {
+      d = 'garba.shop';
+    } else if (hostname.includes('maharashtra') || hostname.includes('maha')) {
+      d = 'maharashtra';
+    } else {
+      // localhost fallback
+      d = localStorage.getItem("test_domain") || "garba.shop";
+    }
+
     if (d === "ttd.in") return "price_b2b_ttd";
     if (d === "maharashtra") return "price_b2b_maharashtra";
     return "price_b2c";

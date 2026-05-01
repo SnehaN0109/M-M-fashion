@@ -35,7 +35,7 @@ const CartPage = () => {
     setCouponLoading(true);
     setCouponError("");
     try {
-      const res = await fetch("http://localhost:5000/api/cart/apply_discount", {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/cart/apply_discount`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ code: coupon.trim().toUpperCase(), cart_total: subtotal }),

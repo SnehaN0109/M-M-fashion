@@ -1,0 +1,296 @@
+{
+  "summary": {
+    "total_tests": 30,
+    "passed_tests": 0,
+    "failed_tests": 30,
+    "skipped_tests": 0,
+    "start_time": "2026-04-27 10:26:27.961026",
+    "end_time": "2026-04-27 10:32:08.107402",
+    "duration": 340.146376,
+    "browsers_tested": [
+      "chrome"
+    ],
+    "domains_tested": [
+      "ttd.in",
+      "garba.shop"
+    ]
+  },
+  "results": [
+    {
+      "test_name": "Homepage Load - garba.shop",
+      "status": "FAIL",
+      "message": "Failed to setup driver",
+      "screenshot": "",
+      "timestamp": "2026-04-27T10:27:11.825391",
+      "browser": "chrome",
+      "url": ""
+    },
+    {
+      "test_name": "Homepage Load - ttd.in",
+      "status": "FAIL",
+      "message": "Failed to setup driver",
+      "screenshot": "",
+      "timestamp": "2026-04-27T10:27:28.926565",
+      "browser": "chrome",
+      "url": ""
+    },
+    {
+      "test_name": "Navigation Menu - garba.shop",
+      "status": "FAIL",
+      "message": "Failed to setup driver",
+      "screenshot": "",
+      "timestamp": "2026-04-27T10:27:37.226729",
+      "browser": "chrome",
+      "url": ""
+    },
+    {
+      "test_name": "Navigation Menu - ttd.in",
+      "status": "FAIL",
+      "message": "Failed to setup driver",
+      "screenshot": "",
+      "timestamp": "2026-04-27T10:27:47.590795",
+      "browser": "chrome",
+      "url": ""
+    },
+    {
+      "test_name": "Search Functionality - garba.shop",
+      "status": "FAIL",
+      "message": "Failed to setup driver",
+      "screenshot": "",
+      "timestamp": "2026-04-27T10:27:54.563319",
+      "browser": "chrome",
+      "url": ""
+    },
+    {
+      "test_name": "Responsive Design - garba.shop",
+      "status": "FAIL",
+      "message": "Responsive issues: Desktop: Driver setup failed; Tablet: Driver setup failed; Mobile: Driver setup failed",
+      "screenshot": "",
+      "timestamp": "2026-04-27T10:28:33.848442",
+      "browser": "chrome",
+      "url": ""
+    },
+    {
+      "test_name": "Domain Switching",
+      "status": "FAIL",
+      "message": "Failed to setup driver",
+      "screenshot": "",
+      "timestamp": "2026-04-27T10:28:39.132804",
+      "browser": "chrome",
+      "url": ""
+    },
+    {
+      "test_name": "Category Pages - garba.shop",
+      "status": "FAIL",
+      "message": "Failed to setup driver",
+      "screenshot": "",
+      "timestamp": "2026-04-27T10:28:45.372106",
+      "browser": "chrome",
+      "url": ""
+    },
+    {
+      "test_name": "Category Pages - ttd.in",
+      "status": "FAIL",
+      "message": "Failed to setup driver",
+      "screenshot": "",
+      "timestamp": "2026-04-27T10:28:53.257442",
+      "browser": "chrome",
+      "url": ""
+    },
+    {
+      "test_name": "Product Filtering - garba.shop",
+      "status": "FAIL",
+      "message": "Failed to setup driver",
+      "screenshot": "",
+      "timestamp": "2026-04-27T10:28:59.022851",
+      "browser": "chrome",
+      "url": ""
+    },
+    {
+      "test_name": "Product Sorting - garba.shop",
+      "status": "FAIL",
+      "message": "Failed to setup driver",
+      "screenshot": "",
+      "timestamp": "2026-04-27T10:29:13.578447",
+      "browser": "chrome",
+      "url": ""
+    },
+    {
+      "test_name": "Product Search Results - garba.shop",
+      "status": "FAIL",
+      "message": "Failed to setup driver",
+      "screenshot": "",
+      "timestamp": "2026-04-27T10:29:18.581723",
+      "browser": "chrome",
+      "url": ""
+    },
+    {
+      "test_name": "Product Detail Page Load - garba.shop",
+      "status": "FAIL",
+      "message": "Failed to setup driver",
+      "screenshot": "",
+      "timestamp": "2026-04-27T10:29:30.411572",
+      "browser": "chrome",
+      "url": ""
+    },
+    {
+      "test_name": "Product Detail Page Load - ttd.in",
+      "status": "FAIL",
+      "message": "Failed to setup driver",
+      "screenshot": "",
+      "timestamp": "2026-04-27T10:29:35.744843",
+      "browser": "chrome",
+      "url": ""
+    },
+    {
+      "test_name": "Product Image Gallery - garba.shop",
+      "status": "FAIL",
+      "message": "Failed to setup driver",
+      "screenshot": "",
+      "timestamp": "2026-04-27T10:29:41.511867",
+      "browser": "chrome",
+      "url": ""
+    },
+    {
+      "test_name": "Product Options Selection - garba.shop",
+      "status": "FAIL",
+      "message": "Failed to setup driver",
+      "screenshot": "",
+      "timestamp": "2026-04-27T10:29:46.427791",
+      "browser": "chrome",
+      "url": ""
+    },
+    {
+      "test_name": "Add to Cart Functionality - garba.shop",
+      "status": "FAIL",
+      "message": "Failed to setup driver",
+      "screenshot": "",
+      "timestamp": "2026-04-27T10:29:52.327865",
+      "browser": "chrome",
+      "url": ""
+    },
+    {
+      "test_name": "Product Information Display - garba.shop",
+      "status": "FAIL",
+      "message": "Failed to setup driver",
+      "screenshot": "",
+      "timestamp": "2026-04-27T10:30:01.459711",
+      "browser": "chrome",
+      "url": ""
+    },
+    {
+      "test_name": "Product Information Display - ttd.in",
+      "status": "FAIL",
+      "message": "Failed to setup driver",
+      "screenshot": "",
+      "timestamp": "2026-04-27T10:30:11.085140",
+      "browser": "chrome",
+      "url": ""
+    },
+    {
+      "test_name": "Add to Cart from Product List - garba.shop",
+      "status": "FAIL",
+      "message": "Failed to setup driver",
+      "screenshot": "",
+      "timestamp": "2026-04-27T10:30:22.165646",
+      "browser": "chrome",
+      "url": ""
+    },
+    {
+      "test_name": "Cart Page Functionality - garba.shop",
+      "status": "FAIL",
+      "message": "Failed to setup driver",
+      "screenshot": "",
+      "timestamp": "2026-04-27T10:30:32.919333",
+      "browser": "chrome",
+      "url": ""
+    },
+    {
+      "test_name": "Checkout Form Validation - garba.shop",
+      "status": "FAIL",
+      "message": "Failed to setup driver",
+      "screenshot": "",
+      "timestamp": "2026-04-27T10:30:42.044893",
+      "browser": "chrome",
+      "url": ""
+    },
+    {
+      "test_name": "Successful Checkout Flow - garba.shop",
+      "status": "FAIL",
+      "message": "Failed to setup driver",
+      "screenshot": "",
+      "timestamp": "2026-04-27T10:30:47.543342",
+      "browser": "chrome",
+      "url": ""
+    },
+    {
+      "test_name": "Cart Persistence - garba.shop",
+      "status": "FAIL",
+      "message": "Failed to setup driver",
+      "screenshot": "",
+      "timestamp": "2026-04-27T10:30:55.725950",
+      "browser": "chrome",
+      "url": ""
+    },
+    {
+      "test_name": "Page Load Performance - garba.shop - chrome",
+      "status": "FAIL",
+      "message": "Failed to setup driver",
+      "screenshot": "",
+      "timestamp": "2026-04-27T10:31:01.461261",
+      "browser": "chrome",
+      "url": ""
+    },
+    {
+      "test_name": "API Response Times - garba.shop",
+      "status": "FAIL",
+      "message": "API performance issues: /api/products: Error/Not Found; /api/categories: Error/Not Found; /api/cart: Error/Not Found; /health: Error/Not Found",
+      "screenshot": "",
+      "timestamp": "2026-04-27T10:31:17.756809",
+      "browser": "chrome",
+      "url": ""
+    },
+    {
+      "test_name": "Memory Usage - garba.shop - chrome",
+      "status": "FAIL",
+      "message": "Failed to setup driver",
+      "screenshot": "",
+      "timestamp": "2026-04-27T10:31:22.708817",
+      "browser": "chrome",
+      "url": ""
+    },
+    {
+      "test_name": "JavaScript Errors - garba.shop - chrome",
+      "status": "FAIL",
+      "message": "Failed to setup driver",
+      "screenshot": "",
+      "timestamp": "2026-04-27T10:31:29.719456",
+      "browser": "chrome",
+      "url": ""
+    },
+    {
+      "test_name": "Responsive Performance - garba.shop - chrome",
+      "status": "FAIL",
+      "message": "Responsive performance issues: Desktop: Driver setup failed; Tablet: Driver setup failed; Mobile: Driver setup failed",
+      "screenshot": "",
+      "timestamp": "2026-04-27T10:31:47.758199",
+      "browser": "chrome",
+      "url": ""
+    },
+    {
+      "test_name": "Concurrent User Simulation - garba.shop",
+      "status": "FAIL",
+      "message": "Failed to setup driver",
+      "screenshot": "",
+      "timestamp": "2026-04-27T10:32:08.107402",
+      "browser": "chrome",
+      "url": ""
+    }
+  ],
+  "config": {
+    "frontend_url": "http://localhost:5173",
+    "backend_url": "http://localhost:5000",
+    "max_page_load_time": 5.0,
+    "max_api_response_time": 2.0
+  }
+}

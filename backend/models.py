@@ -10,6 +10,9 @@ class User(db.Model):
     whatsapp_number = db.Column(db.String(20), unique=True, nullable=True)
     email = db.Column(db.String(120), unique=True, nullable=True)
     name = db.Column(db.String(100), nullable=True)
+    # B2B role: 'B2C' (default) or 'WHOLESALER'
+    # server_default ensures existing rows in DB get 'B2C' without a data migration
+    role = db.Column(db.String(20), nullable=False, server_default='B2C', default='B2C')
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     orders = db.relationship('Order', backref='user', lazy=True)
@@ -51,8 +54,9 @@ class Product(db.Model):
     variants = db.relationship('ProductVariant', backref='product', lazy=True, cascade="all, delete-orphan")
     images = db.relationship('ProductImage', backref='product', lazy=True, cascade="all, delete-orphan")
     videos = db.relationship('ProductVideo', backref='product', lazy=True, cascade="all, delete-orphan")
-    reviews = db.relationship('Review', backref='product', lazy=True)
-    photos = db.relationship('UserPhoto', backref='product', lazy=True)
+    reviews = db.relationship('Review', backref='product', lazy=True, cascade="all, delete-orphan")
+    photos = db.relationship('UserPhoto', backref='product', lazy=True, cascade="all, delete-orphan")
+    wishlist = db.relationship('Wishlist', backref='product', lazy=True, cascade="all, delete-orphan")
 
 
 class ProductVariant(db.Model):
@@ -68,6 +72,12 @@ class ProductVariant(db.Model):
     price_b2c = db.Column(db.Numeric(10, 2), default=0)           # garba.shop
     price_b2b_ttd = db.Column(db.Numeric(10, 2), default=0)       # ttd.in
     price_b2b_maharashtra = db.Column(db.Numeric(10, 2), default=0)  # maharashtra domain
+
+    # B2B minimum order quantity (optional, only enforced for B2B domains)
+    moq_b2b = db.Column(db.Integer, nullable=True)
+
+    order_items = db.relationship('OrderItem', backref='variant', lazy=True, cascade="all, delete-orphan")
+    cart_items = db.relationship('CartItem', backref='variant', lazy=True, cascade="all, delete-orphan")
 
 
 class ProductImage(db.Model):
@@ -135,6 +145,9 @@ class Order(db.Model):
     status = db.Column(db.String(50), default='pending_payment')
     # Status flow: pending_payment → confirmed → packed → shipped → delivered
     tracking_number = db.Column(db.String(100), nullable=True)
+    # B2B fields (optional — only populated for wholesaler orders)
+    business_name = db.Column(db.String(200), nullable=True)
+    gst_number = db.Column(db.String(20), nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     items = db.relationship('OrderItem', backref='order', lazy=True, cascade="all, delete-orphan")

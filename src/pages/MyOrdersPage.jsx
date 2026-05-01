@@ -24,7 +24,7 @@ const MyOrdersPage = () => {
     if (!whatsapp) { setLoading(false); return; }
     
     // Fetch orders with full details
-    fetch(`http://localhost:5000/api/orders/my-orders?whatsapp_number=${encodeURIComponent(whatsapp)}`)
+    fetch(`${import.meta.env.VITE_API_URL}/api/orders/my-orders?whatsapp_number=${encodeURIComponent(whatsapp)}`)
       .then((r) => r.json())
       .then(async (data) => {
         if (Array.isArray(data)) {
@@ -32,7 +32,7 @@ const MyOrdersPage = () => {
           const ordersWithDetails = await Promise.all(
             data.map(async (order) => {
               try {
-                const detailRes = await fetch(`http://localhost:5000/api/orders/track/${order.order_id}`);
+                const detailRes = await fetch(`${import.meta.env.VITE_API_URL}/api/orders/track/${order.order_id}`);
                 const detailData = await detailRes.json();
                 return detailData;
               } catch {

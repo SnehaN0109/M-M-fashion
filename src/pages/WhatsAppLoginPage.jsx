@@ -41,8 +41,8 @@ const WhatsAppLoginPage = () => {
   };
 
   const handleVerifyOTP = async () => {
-    if (otp.length < 4) {
-      setError("Please enter the 4-digit OTP.");
+    if (otp.length < 6) {
+      setError("Please enter the 6-digit OTP.");
       return;
     }
     setLoading(true);
@@ -136,15 +136,15 @@ const WhatsAppLoginPage = () => {
           <div className="space-y-4">
             <div className="bg-green-50 border border-green-100 rounded-xl p-3 text-center">
               <p className="text-green-700 text-xs font-bold">OTP sent to +91 {phone}</p>
-              <p className="text-green-600 text-xs mt-0.5">Enter the 4-digit OTP below</p>
+              <p className="text-green-600 text-xs mt-0.5">Enter the 6-digit OTP below</p>
             </div>
 
             <input
               type="tel"
-              maxLength={4}
+              maxLength={6}
               value={otp}
               onChange={(e) => { setOtp(e.target.value.replace(/\D/g, "")); setError(""); }}
-              placeholder="• • • •"
+              placeholder="• • • • • •"
               autoFocus
               className="w-full border border-gray-200 rounded-xl px-4 py-4 text-center tracking-[0.8em] text-2xl font-black focus:outline-none focus:ring-2 focus:ring-green-500"
               onKeyDown={(e) => e.key === "Enter" && handleVerifyOTP()}
@@ -154,7 +154,7 @@ const WhatsAppLoginPage = () => {
 
             <button
               onClick={handleVerifyOTP}
-              disabled={loading || otp.length < 4}
+              disabled={loading || otp.length < 6}
               className="w-full bg-green-500 hover:bg-green-600 text-white font-black py-4 rounded-2xl flex items-center justify-center gap-2 transition disabled:opacity-60"
             >
               {loading && <Loader2 size={18} className="animate-spin" />}
