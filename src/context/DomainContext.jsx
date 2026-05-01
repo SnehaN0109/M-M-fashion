@@ -4,60 +4,71 @@ const DomainContext = createContext();
 
 export const useDomain = () => useContext(DomainContext);
 
+// Per-domain brand config
+const DOMAIN_CONFIGS = {
+  'garba.shop': {
+    brandName: 'garba.shop',
+    tagline: 'Premium Garba & Ethnic Wear',
+    primaryColor: 'pink',
+    isB2B: false,
+    priceKey: 'price_b2c',
+    showSliders: true,
+    showWelcomeOffer: true,
+    supportEmail: 'support@garba.shop',
+    supportPhone: '+91 98765 43210',
+  },
+  'ttd.in': {
+    brandName: 'TTD Fashion',
+    tagline: 'Wholesale Ethnic Wear',
+    primaryColor: 'indigo',
+    isB2B: true,
+    priceKey: 'price_b2b_ttd',
+    showSliders: false,
+    showWelcomeOffer: false,
+    supportEmail: 'support@ttd.in',
+    supportPhone: '+91 98765 43210',
+  },
+  'maharashtra': {
+    brandName: 'MH Fashion',
+    tagline: 'Maharashtra Wholesale',
+    primaryColor: 'orange',
+    isB2B: true,
+    priceKey: 'price_b2b_maharashtra',
+    showSliders: false,
+    showWelcomeOffer: false,
+    supportEmail: 'support@mhfashion.in',
+    supportPhone: '+91 98765 43210',
+  },
+};
+
+const DEFAULT_CONFIG = DOMAIN_CONFIGS['garba.shop'];
+
 export const DomainProvider = ({ children }) => {
   const [domainConfig, setDomainConfig] = useState({
     domain: 'localhost',
-    isB2B: false,
-    priceKey: 'price_garba', // default
-    showSliders: true,
-    showWelcomeOffer: true
+    ...DEFAULT_CONFIG,
   });
 
   useEffect(() => {
-    // In production, this would be window.location.hostname
     const hostname = window.location.hostname;
-    // For local testing you could check a localStorage value or VITE env var
-    // Hardcoded logic for now based on domain names:
-    
-    let isB2B = false;
-    let priceKey = 'price_garba'; // def
-    let showSliders = true;
-    let showWelcomeOffer = true;
+
+    let matched = DEFAULT_CONFIG;
+    let resolvedDomain = hostname;
 
     if (hostname.includes('ttd.in')) {
-      isB2B = true;
-      priceKey = 'price_ttd';
+      matched = DOMAIN_CONFIGS['ttd.in'];
     } else if (hostname.includes('garba.shop')) {
-      isB2B = false;
-      priceKey = 'price_garba';
+      matched = DOMAIN_CONFIGS['garba.shop'];
     } else if (hostname.includes('maharashtra') || hostname.includes('maha')) {
-      isB2B = true;
-      priceKey = 'price_maha';
-    } 
-    // Fallback logic for localhost testing
-    else {
+      matched = DOMAIN_CONFIGS['maharashtra'];
+    } else {
+      // localhost fallback — read from localStorage for dev testing
       const testDomain = localStorage.getItem('test_domain') || 'garba.shop';
-      if (testDomain === 'ttd.in') {
-        isB2B = true;
-        priceKey = 'price_ttd';
-      } else if (testDomain === 'maha') {
-        isB2B = true;
-        priceKey = 'price_maha';
-      }
+      matched = DOMAIN_CONFIGS[testDomain] || DEFAULT_CONFIG;
+      resolvedDomain = testDomain;
     }
 
-    if (isB2B) {
-      showSliders = false;
-      showWelcomeOffer = false;
-    }
-
-    setDomainConfig({
-      domain: hostname,
-      isB2B,
-      priceKey,
-      showSliders,
-      showWelcomeOffer
-    });
+    setDomainConfig({ domain: resolvedDomain, ...matched });
   }, []);
 
   return (

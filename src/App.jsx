@@ -23,6 +23,13 @@ import ContactUsPage from "./pages/ContactUsPage";
 import ShippingPolicyPage from "./pages/ShippingPolicyPage";
 import ReturnRefundPage from "./pages/ReturnRefundPage";
 import PrivacyPolicyPage from "./pages/PrivacyPolicyPage";
+import FAQPage from "./pages/FAQPage";
+import TermsOfServicePage from "./pages/TermsOfServicePage";
+import AdminDashboardPage from "./pages/AdminDashboardPage";
+import AdminLoginPage from "./pages/AdminLoginPage";
+import AdminGuard from "./components/AdminGuard";
+import AuthGuard from "./components/AuthGuard";
+import DevDomainSwitcher from "./components/DevDomainSwitcher";
 
 /* ===== Category Pages Removed (Now using ProductListPage with props) ===== */
 
@@ -49,14 +56,14 @@ function App() {
         <Route path="/product/:id" element={<ProductDetailPage />} />
 
         {/* ===== Cart & Checkout ===== */}
-        <Route path="/cart" element={<CartPage />} />
-        <Route path="/checkout" element={<CheckoutPage />} />
-        <Route path="/payment" element={<PaymentPage />} />
-        <Route path="/order-success" element={<OrderSuccessPage />} />
+        <Route path="/cart" element={<AuthGuard><CartPage /></AuthGuard>} />
+        <Route path="/checkout" element={<AuthGuard><CheckoutPage /></AuthGuard>} />
+        <Route path="/payment" element={<AuthGuard><PaymentPage /></AuthGuard>} />
+        <Route path="/order-success" element={<AuthGuard><OrderSuccessPage /></AuthGuard>} />
 
         {/* ===== Orders ===== */}
-        <Route path="/my-orders" element={<MyOrdersPage />} />
-        <Route path="/trackorder/:orderId" element={<TrackOrderPage />} />
+        <Route path="/my-orders" element={<AuthGuard><MyOrdersPage /></AuthGuard>} />
+        <Route path="/trackorder/:orderId" element={<AuthGuard><TrackOrderPage /></AuthGuard>} />
 
         {/* ===== Search ===== */}
         <Route path="/search" element={<SearchResultsPage />} />
@@ -69,6 +76,7 @@ function App() {
 
         {/* ===== Upload Photos ===== */}
         <Route path="/upload-photos" element={<UploadUserPhotosPage />} />
+        <Route path="/upload-photos/:productId" element={<UploadUserPhotosPage />} />
 
         {/* ===== Information Pages ===== */}
         <Route path="/about-us" element={<AboutUsPage />} />
@@ -76,6 +84,12 @@ function App() {
         <Route path="/shipping-policy" element={<ShippingPolicyPage />} />
         <Route path="/return-refund" element={<ReturnRefundPage />} />
         <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
+        <Route path="/faq" element={<FAQPage />} />
+        <Route path="/terms-of-service" element={<TermsOfServicePage />} />
+
+        {/* ===== Admin ===== */}
+        <Route path="/admin-login" element={<AdminLoginPage />} />
+        <Route path="/admin" element={<AdminGuard><AdminDashboardPage /></AdminGuard>} />
 
         {/* ===== 404 Page ===== */}
         <Route
@@ -93,6 +107,7 @@ function App() {
       </Routes>
 
       <Footer />
+      <DevDomainSwitcher />
     </Router>
   );
 }

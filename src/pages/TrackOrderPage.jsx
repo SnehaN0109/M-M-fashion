@@ -1,142 +1,172 @@
-import { useParams } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { useParams, Link } from "react-router-dom";
+import { Loader2, Package, CheckCircle, Truck, MapPin, Box, Home } from "lucide-react";
+
+const STATUS_STEPS = [
+  { key: "pending_payment", label: "Order Placed", icon: Package },
+  { key: "confirmed",       label: "Confirmed",    icon: CheckCircle },
+  { key: "packed",          label: "Packed",        icon: Box },
+  { key: "shipped",         label: "Shipped",       icon: Truck },
+  { key: "delivered",       label: "Delivered",     icon: Home },
+];
+
+const STATUS_INDEX = {
+  pending_payment: 0,
+  confirmed: 1,
+  packed: 2,
+  shipped: 3,
+  delivered: 4,
+  cancelled: -1,
+};
 
 const TrackOrderPage = () => {
   const { orderId } = useParams();
+  const [order, setOrder] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
-  // Sample Order Data (Later connect to backend)
-  const order = {
-    id: orderId || "OD123456789012345000",
-    product: {
-      name: "Premium Cotton Kurti",
-      image: "https://via.placeholder.com/100",
-      quantity: 1,
-      seller: "Saraswati Fashion Hub",
-    },
-    status: "Shipped", // Change to test
-    address: {
-      name: "Saraswati Jadhav",
-      details: "Flat No 12, ABC Apartments, Nagpur, Maharashtra - 440001",
-      mobile: "9876543210",
-    },
-    payment: {
-      method: "UPI",
-      status: "Paid",
-      total: 4599,
-    },
-    estimatedDelivery: "Tomorrow",
-    courier: {
-      partner: "Ekart Logistics",
-      trackingNumber: "EK123456789IN",
-    },
-  };
+  useEffect(() => {
+    if (!orderId) return;
+    fetch(`http://localhost:5000/api/orders/track/${orderId}`)
+      .then((r) => {
+        if (!r.ok) throw new Error("Order not found.");
+        return r.json();
+      })
+      .then(setOrder)
+      .catch((e) => setError(e.message))
+      .finally(() => setLoading(false));
+  }, [orderId]);
 
-  const statusSteps = [
-    "Order Confirmed",
-    "Packed",
-    "Shipped",
-    "Out for Delivery",
-    "Delivered",
-  ];
+  if (loading) return (
+    <div className="min-h-screen flex items-center justify-center">
+      <Loader2 className="w-10 h-10 text-pink-600 animate-spin" />
+    </div>
+  );
 
-  const currentStep = statusSteps.indexOf(order.status);
+  if (error) return (
+    <div className="min-h-screen flex flex-col items-center justify-center gap-4 px-6">
+      <Package size={48} className="text-gray-200" />
+      <p className="text-xl font-black text-gray-500">{error}</p>
+      <Link to="/my-orders" className="px-6 py-3 bg-pink-600 text-white font-bold rounded-2xl text-sm">
+        My Orders
+      </Link>
+    </div>
+  );
+
+  if (!order) return null;
+
+  const currentStep = STATUS_INDEX[order.status] ?? 0;
+  const isCancelled = order.status === "cancelled";
 
   return (
-    <div className="max-w-5xl mx-auto px-6 py-10">
+    <div className="max-w-2xl mx-auto px-6 py-10">
 
-      {/* 1️⃣ Order ID */}
+      {/* Header */}
       <div className="mb-8">
-        <h1 className="text-2xl font-bold mb-2">Order Details</h1>
-        <p className="text-gray-600">
-          <span className="font-semibold">Order ID:</span> {order.id}
-        </p>
-        <p className="text-sm text-gray-500">
-          Used for customer support and reference
+        <p className="text-xs font-black text-pink-600 uppercase tracking-widest mb-1">Order Tracking</p>
+        <h1 className="text-3xl font-black text-gray-900">Order #{order.order_id}</h1>
+        <p className="text-sm text-gray-400 mt-1">
+          Placed on {new Date(order.created_at).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" })}
         </p>
       </div>
 
-      {/* 2️⃣ Product Details */}
-      <div className="border rounded-lg p-5 mb-6 flex gap-5">
-        <img
-          src={order.product.image}
-          alt="product"
-          className="w-24 h-24 object-cover rounded"
-        />
-        <div>
-          <h2 className="font-semibold text-lg">{order.product.name}</h2>
-          <p>Quantity: {order.product.quantity}</p>
-          <p className="text-sm text-gray-600">
-            Seller: {order.product.seller}
-          </p>
-        </div>
-      </div>
+      {/* Status Timeline */}
+      <div className="bg-white border rounded-2xl p-6 mb-6">
+        <h2 className="text-sm font-black text-gray-400 uppercase tracking-widest mb-6">Status</h2>
 
-      {/* 3️⃣ Order Status Timeline */}
-      <div className="mb-8">
-        <h2 className="font-semibold text-lg mb-4">Order Status</h2>
+        {isCancelled ? (
+          <div className="bg-red-50 border border-red-100 rounded-xl p-4 text-center">
+            <p className="font-black text-red-600 text-lg">Order Cancelled</p>
+            <p className="text-sm text-red-400 mt-1">This order has been cancelled.</p>
+          </div>
+        ) : (
+          <div className="relative">
+            {/* Progress line */}
+            <div className="absolute top-5 left-5 right-5 h-0.5 bg-gray-100" />
+            <div
+              className="absolute top-5 left-5 h-0.5 bg-pink-500 transition-all duration-700"
+              style={{ width: `${(currentStep / (STATUS_STEPS.length - 1)) * 100}%` }}
+            />
 
-        <div className="flex justify-between items-center">
-          {statusSteps.map((step, index) => (
-            <div key={step} className="flex-1 text-center">
-              <div
-                className={`w-8 h-8 mx-auto rounded-full flex items-center justify-center text-white
-                ${index <= currentStep ? "bg-green-500" : "bg-gray-300"}`}
-              >
-                ✓
-              </div>
-              <p className="text-xs mt-2">{step}</p>
+            <div className="relative flex justify-between">
+              {STATUS_STEPS.map((step, i) => {
+                const Icon = step.icon;
+                const done = i <= currentStep;
+                const active = i === currentStep;
+                return (
+                  <div key={step.key} className="flex flex-col items-center gap-2 w-16">
+                    <div className={`w-10 h-10 rounded-full flex items-center justify-center z-10 transition-all ${
+                      done ? "bg-pink-600 text-white shadow-lg" : "bg-gray-100 text-gray-300"
+                    } ${active ? "ring-4 ring-pink-100 scale-110" : ""}`}>
+                      <Icon size={18} />
+                    </div>
+                    <p className={`text-[10px] font-black text-center leading-tight ${done ? "text-gray-900" : "text-gray-300"}`}>
+                      {step.label}
+                    </p>
+                  </div>
+                );
+              })}
             </div>
-          ))}
+          </div>
+        )}
+      </div>
+
+      {/* Tracking Number */}
+      {order.tracking_number && (
+        <div className="bg-blue-50 border border-blue-100 rounded-2xl p-5 mb-6 flex items-center gap-3">
+          <Truck size={20} className="text-blue-500 flex-shrink-0" />
+          <div>
+            <p className="text-xs font-black text-blue-400 uppercase tracking-widest">Tracking Number</p>
+            <p className="font-black text-blue-700 text-lg">{order.tracking_number}</p>
+          </div>
         </div>
+      )}
+
+      {/* Order Info */}
+      <div className="bg-white border rounded-2xl p-6 mb-6 space-y-4">
+        <h2 className="text-sm font-black text-gray-400 uppercase tracking-widest">Order Info</h2>
+        <div className="grid grid-cols-2 gap-4 text-sm">
+          <div>
+            <p className="text-xs text-gray-400 font-black uppercase tracking-widest">Customer</p>
+            <p className="font-bold text-gray-900 mt-0.5">{order.customer_name}</p>
+          </div>
+          <div>
+            <p className="text-xs text-gray-400 font-black uppercase tracking-widest">Payment</p>
+            <p className="font-bold text-gray-900 mt-0.5">{order.payment_method || "COD"}</p>
+          </div>
+          <div>
+            <p className="text-xs text-gray-400 font-black uppercase tracking-widest">Items</p>
+            <p className="font-bold text-gray-900 mt-0.5">{order.items?.length} item{order.items?.length !== 1 ? "s" : ""}</p>
+          </div>
+          <div>
+            <p className="text-xs text-gray-400 font-black uppercase tracking-widest">Total</p>
+            <p className="font-bold text-gray-900 mt-0.5">
+              ₹{order.items?.reduce((s, i) => s + i.price_at_purchase * i.quantity, 0).toLocaleString()}
+            </p>
+          </div>
+        </div>
+
+        {/* Delivery address */}
+        {order.city && (
+          <div className="border-t pt-4 flex gap-2">
+            <MapPin size={16} className="text-gray-400 flex-shrink-0 mt-0.5" />
+            <p className="text-sm text-gray-600">
+              {order.city}, {order.state} — {order.pincode}
+            </p>
+          </div>
+        )}
       </div>
 
-      {/* 4️⃣ Delivery Address */}
-      <div className="border rounded-lg p-5 mb-6">
-        <h2 className="font-semibold mb-2">Delivery Address</h2>
-        <p>{order.address.name}</p>
-        <p className="text-sm text-gray-600">{order.address.details}</p>
-        <p className="text-sm">Mobile: {order.address.mobile}</p>
-      </div>
-
-      {/* 5️⃣ Payment Info */}
-      <div className="border rounded-lg p-5 mb-6">
-        <h2 className="font-semibold mb-2">Payment Information</h2>
-        <p>Method: {order.payment.method}</p>
-        <p>Status: {order.payment.status}</p>
-        <p>Total: ₹{order.payment.total}</p>
-      </div>
-
-      {/* 6️⃣ Estimated Delivery */}
-      <div className="border rounded-lg p-5 mb-6">
-        <h2 className="font-semibold mb-2">Estimated Delivery</h2>
-        <p className="text-green-600 font-medium">
-          Arriving {order.estimatedDelivery}
-        </p>
-      </div>
-
-      {/* 7️⃣ Courier Details */}
-      <div className="border rounded-lg p-5 mb-6">
-        <h2 className="font-semibold mb-2">Courier Details</h2>
-        <p>Partner: {order.courier.partner}</p>
-        <p>Tracking No: {order.courier.trackingNumber}</p>
-      </div>
-
-      {/* 8️⃣ Options */}
-      <div className="flex gap-4 flex-wrap">
-        <button className="bg-red-500 text-white px-4 py-2 rounded">
-          Cancel Order
-        </button>
-
-        <button className="bg-yellow-500 text-white px-4 py-2 rounded">
-          Return / Replace
-        </button>
-
-        <button className="bg-blue-600 text-white px-4 py-2 rounded">
-          Download Invoice
-        </button>
-
-        <button className="bg-black text-white px-4 py-2 rounded">
+      {/* Actions */}
+      <div className="flex gap-3 flex-wrap">
+        <Link to="/my-orders"
+          className="px-6 py-3 bg-gray-900 text-white font-bold rounded-2xl text-sm hover:bg-black transition">
+          ← My Orders
+        </Link>
+        <Link to="/contact-us"
+          className="px-6 py-3 border border-gray-200 text-gray-700 font-bold rounded-2xl text-sm hover:bg-gray-50 transition">
           Contact Support
-        </button>
+        </Link>
       </div>
     </div>
   );
