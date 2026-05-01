@@ -8,15 +8,6 @@ load_dotenv(dotenv_path=Path(__file__).resolve().parent / ".env", override=True)
 
 def _build_db_uri():
     """Build the DB URI. Adds SSL for Aiven cloud (DB_USE_SSL=true)."""
-    query = {}
-    if os.getenv("DB_USE_SSL", "false").lower() == "true":
-        # Aiven SSL with relaxed verification for certificate issues
-        query = {
-            "ssl_disabled": "false",
-            "ssl_verify_cert": "false", 
-            "ssl_verify_identity": "false"
-        }
-
     return URL.create(
         "mysql+pymysql",
         username=os.getenv("DB_USERNAME", "root"),
@@ -24,7 +15,6 @@ def _build_db_uri():
         host=os.getenv("DB_HOST", "localhost"),
         port=int(os.getenv("DB_PORT", 3306)),
         database=os.getenv("DB_NAME", "mmfashion"),
-        query=query,
     )
 
 
@@ -33,9 +23,13 @@ class Config:
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     SECRET_KEY = os.getenv("SECRET_KEY", "dev-secret-key")
     ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "admin123")
-    # Aiven cloud MySQL requires SSL
+    
+    # Aiven cloud MySQL SSL configuration
     SQLALCHEMY_ENGINE_OPTIONS = {
         "connect_args": {
-            "ssl": {}
+            "ssl": {
+                "ssl_verify_cert": False,
+                "ssl_verify_identity": False
+            } if os.getenv("DB_USE_SSL", "false").lower() == "true" else {}
         }
     }

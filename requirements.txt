@@ -1,3 +1,14 @@
+# Backend Dependencies
+Flask==2.3.3
+Flask-CORS==4.0.0
+Flask-SQLAlchemy==3.0.5
+PyMySQL==1.1.0
+PyJWT==2.8.0
+python-dotenv==1.0.0
+SQLAlchemy==2.0.21
+Werkzeug==2.3.7
+
+# Testing Dependencies
 selenium==4.15.2
 webdriver-manager==4.0.1
 python-docx==1.1.0
