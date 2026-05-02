@@ -1,5 +1,6 @@
 from flask import Flask, jsonify, send_from_directory
 from flask_cors import CORS
+from flask_mail import Mail
 from config import Config
 from models import db
 from sqlalchemy import text
@@ -23,6 +24,12 @@ def create_app():
     }})
 
     db.init_app(app)
+    
+    # Initialize Flask-Mail
+    mail = Mail(app)
+    
+    # Make mail available to other modules
+    app.mail = mail
 
     # ── Register Blueprints ──────────────────────────────────────────────────
     from routes.products import products_bp
