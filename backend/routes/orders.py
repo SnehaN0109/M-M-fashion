@@ -1,6 +1,7 @@
 from flask import Blueprint, jsonify, request
 from models import db, Order, OrderItem, ProductVariant, DiscountCode, User
-from utils import resolve_price_key, is_b2b_domain
+from utils import resolve_price_key, is_b2b_domain, assign_tracking_number
+from whatsapp_service import send_order_confirmation
 
 orders_bp = Blueprint('orders', __name__)
 
@@ -121,7 +122,7 @@ def checkout():
         tax_amount=0.0,
         total_amount=total_amount,
         domain_origin=domain,
-        payment_method='COD',
+        payment_method=data.get('payment_method', 'UPI'),
         status='PENDING_PAYMENT',
         payment_status='PENDING',
         # B2B optional fields
@@ -150,7 +151,18 @@ def checkout():
         # Deduct stock
         item_data['variant'].quantity -= item_data['quantity']
 
+    # ── Auto-generate tracking number at order creation ───────────────────────
+    # Assigned immediately so it's available in the WhatsApp message and
+    # on the success page — admin never needs to enter it manually.
+    assign_tracking_number(order, db.session)
+
     db.session.commit()
+
+    # ── Send WhatsApp order confirmation (fire-and-forget, never blocks order) ─
+    try:
+        send_order_confirmation(order)
+    except Exception:
+        pass  # WhatsApp failure must never fail the order
 
     return jsonify({
         "message": "Order placed successfully",
@@ -158,7 +170,8 @@ def checkout():
         "total_amount": total_amount,
         "status": order.status,
         "payment_status": order.payment_status,
-        "payment_method": order.payment_method
+        "payment_method": order.payment_method,
+        "tracking_number": order.tracking_number,
     }), 201
 
 
@@ -188,6 +201,7 @@ def track_order(order_id):
         "order_id": o.id,
         "status": o.status,
         "payment_status": o.payment_status,
+        "payment_proof": o.payment_proof,
         "tracking_number": o.tracking_number,
         "customer_name": o.customer_name,
         "customer_email": o.customer_email,
@@ -208,6 +222,26 @@ def track_order(order_id):
         "created_at": o.created_at.isoformat(),
         "items": items_detail
     })
+
+
+# ─── WhatsApp Notify (manual retry) ─────────────────────────────────────────
+
+@orders_bp.route('/<int:order_id>/notify-whatsapp', methods=['POST'])
+def notify_whatsapp(order_id):
+    """
+    Manually trigger a WhatsApp order confirmation.
+    Useful for retrying failed sends or testing without re-placing an order.
+    Always returns 200 — WhatsApp failure is non-critical.
+    """
+    order = Order.query.get_or_404(order_id)
+    result = send_order_confirmation(order)
+    if result["success"]:
+        return jsonify({"message": "WhatsApp notification sent", "order_id": order_id}), 200
+    return jsonify({
+        "message": "WhatsApp notification failed (order not affected)",
+        "detail": result["detail"],
+        "order_id": order_id,
+    }), 200
 
 
 # ─── My Orders ───────────────────────────────────────────────────────────────

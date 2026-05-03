@@ -4,14 +4,13 @@ import { WishlistContext } from "../context/WishlistContext";
 import { CartContext } from "../context/CartContext";
 import { useDomain } from "../context/DomainContext";
 import { ShoppingCart, Heart, Search, Menu, X, User, LogOut, Package } from "lucide-react";
-
 const Header = () => {
   const [menuOpen, setMenuOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [searchFocused, setSearchFocused] = useState(false);
   const [suggestions, setSuggestions] = useState([]);
-  const { wishlist } = useContext(WishlistContext);
-  const { cartItems } = useContext(CartContext);
+  const { wishlist, clearWishlist } = useContext(WishlistContext);
+  const { cartItems, resetCart } = useContext(CartContext);
   const { brandName, tagline, isB2B } = useDomain();
   const navigate = useNavigate();
 
@@ -19,6 +18,10 @@ const Header = () => {
   const isLoggedIn = !!localStorage.getItem("auth_token");
 
   const handleLogout = () => {
+    // 1. Clear in-memory state for this user — other users' data stays in localStorage
+    clearWishlist();
+    resetCart();
+    // 2. Remove auth keys
     localStorage.removeItem("auth_token");
     localStorage.removeItem("user_id");
     localStorage.removeItem("whatsapp_number");

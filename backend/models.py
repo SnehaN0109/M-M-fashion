@@ -141,17 +141,44 @@ class Order(db.Model):
 
     # Meta
     domain_origin = db.Column(db.String(100))
-    payment_method = db.Column(db.String(50), default='COD')
+    payment_method = db.Column(db.String(50), default='UPI')
     status = db.Column(db.String(50), default='PENDING_PAYMENT')
-    payment_status = db.Column(db.String(50), default='PENDING')
-    # Status flow: PENDING_PAYMENT → PLACED → PACKED → SHIPPED → OUT_FOR_DELIVERY → DELIVERED
+    payment_status = db.Column(db.String(20), default='PENDING')
     tracking_number = db.Column(db.String(100), nullable=True)
+    payment_proof = db.Column(db.String(500), nullable=True)
     # B2B fields (optional — only populated for wholesaler orders)
     business_name = db.Column(db.String(200), nullable=True)
     gst_number = db.Column(db.String(20), nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     items = db.relationship('OrderItem', backref='order', lazy=True, cascade="all, delete-orphan")
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'user_id': self.user_id,
+            'customer_name': self.customer_name,
+            'customer_email': self.customer_email,
+            'customer_phone': self.customer_phone,
+            'address_line1': self.address_line1,
+            'address_line2': self.address_line2,
+            'city': self.city,
+            'state': self.state,
+            'pincode': self.pincode,
+            'subtotal': self.subtotal,
+            'discount_amount': self.discount_amount,
+            'discount_code': self.discount_code,
+            'shipping_charge': self.shipping_charge,
+            'tax_amount': self.tax_amount,
+            'total_amount': self.total_amount,
+            'domain_origin': self.domain_origin,
+            'payment_method': self.payment_method,
+            'status': self.status,
+            'payment_status': self.payment_status or 'PENDING',
+            'payment_proof': self.payment_proof,
+            'tracking_number': self.tracking_number,
+            'created_at': self.created_at.isoformat() if self.created_at else None
+        }
 
 
 class OrderItem(db.Model):

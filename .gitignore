@@ -26,6 +26,28 @@ __pycache__/
 *.db
 *.sqlite3
 
+# Backend env files (contain real credentials — never commit)
+backend/.env
+backend/.env.production
+
+# Uploaded files (user content — not source code)
+backend/uploads/payment_proofs/*
+backend/uploads/photos/*
+backend/uploads/products/*
+!backend/uploads/payment_proofs/.gitkeep
+!backend/uploads/photos/.gitkeep
+!backend/uploads/products/.gitkeep
+
+# Test / migration / debug scripts (not needed in production)
+backend/test_*.py
+backend/regression_test.py
+backend/final_test.py
+backend/migrate_*.py
+backend/check_*.py
+backend/verify_*.py
+backend/show_*.py
+backend/add_test_*.py
+
 # Logs
 logs/
 *.log

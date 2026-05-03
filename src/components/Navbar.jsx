@@ -1,15 +1,28 @@
 import React, { useState, useContext } from "react";
 import { Link, NavLink, useNavigate } from "react-router-dom";
-import { ShoppingCart, Heart, User, Search, Menu, X, Package } from "lucide-react";
+import { ShoppingCart, Heart, User, Search, Menu, X, Package, LogOut } from "lucide-react";
 import { WishlistContext } from "../context/WishlistContext";
 import { CartContext } from "../context/CartContext";
 
 const Navbar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const { wishlist } = useContext(WishlistContext);
-  const { cartItems } = useContext(CartContext);
+  const { wishlist, clearWishlist } = useContext(WishlistContext);
+  const { cartItems, resetCart } = useContext(CartContext);
   const cartCount = cartItems.reduce((acc, item) => acc + (item.cartQuantity || 1), 0);
   const navigate = useNavigate();
+
+  const isLoggedIn = !!localStorage.getItem("auth_token");
+
+  const handleLogout = () => {
+    clearWishlist();
+    resetCart();
+    localStorage.removeItem("auth_token");
+    localStorage.removeItem("user_id");
+    localStorage.removeItem("whatsapp_number");
+    localStorage.removeItem("email");
+    setIsMenuOpen(false);
+    navigate("/login");
+  };
 
   const navLinks = [
     { title: "Boutique", path: "/products" },
@@ -73,10 +86,22 @@ const Navbar = () => {
               )}
            </Link>
 
-           <Link to="/login" className="hidden sm:flex items-center gap-2 bg-gray-900 text-white px-5 py-2.5 rounded-full text-xs font-black uppercase tracking-widest hover:bg-black transition shadow-lg active:scale-95">
-              <User size={14} />
-              Login
-           </Link>
+           {/* Login / Logout */}
+           {isLoggedIn ? (
+             <button
+               onClick={handleLogout}
+               className="hidden sm:flex items-center gap-2 bg-gray-900 text-white px-5 py-2.5 rounded-full text-xs font-black uppercase tracking-widest hover:bg-red-600 transition shadow-lg active:scale-95"
+               title="Logout"
+             >
+               <LogOut size={14} />
+               Logout
+             </button>
+           ) : (
+             <Link to="/login" className="hidden sm:flex items-center gap-2 bg-gray-900 text-white px-5 py-2.5 rounded-full text-xs font-black uppercase tracking-widest hover:bg-black transition shadow-lg active:scale-95">
+               <User size={14} />
+               Login
+             </Link>
+           )}
 
            {/* Mobile Toggle */}
            <button className="lg:hidden" onClick={() => setIsMenuOpen(!isMenuOpen)}>
@@ -99,8 +124,20 @@ const Navbar = () => {
              </Link>
            ))}
            <div className="pt-4 border-t flex flex-col gap-4">
-              <Link to="/my-orders" onClick={() => setIsOpen(false)} className="text-sm font-bold text-gray-500 uppercase tracking-widest">My Orders</Link>
-              <Link to="/login" onClick={() => setIsOpen(false)} className="w-full text-center bg-gray-900 text-white py-4 rounded-2xl font-black uppercase tracking-widest">Login</Link>
+              <Link to="/my-orders" onClick={() => setIsMenuOpen(false)} className="text-sm font-bold text-gray-500 uppercase tracking-widest">My Orders</Link>
+              <Link to="/wishlist" onClick={() => setIsMenuOpen(false)} className="text-sm font-bold text-gray-500 uppercase tracking-widest">Wishlist</Link>
+              {isLoggedIn ? (
+                <button
+                  onClick={handleLogout}
+                  className="w-full text-center bg-red-600 text-white py-4 rounded-2xl font-black uppercase tracking-widest"
+                >
+                  Logout
+                </button>
+              ) : (
+                <Link to="/login" onClick={() => setIsMenuOpen(false)} className="w-full text-center bg-gray-900 text-white py-4 rounded-2xl font-black uppercase tracking-widest">
+                  Login
+                </Link>
+              )}
            </div>
         </div>
       )}

@@ -11,7 +11,7 @@ import { WishlistContext } from "../context/WishlistContext";
 const ProductDetailPage = () => {
   const { id } = useParams();
   const { domain, priceKey } = useDomain();
-  const { addToCart } = useContext(CartContext);
+  const { addToCart, cartItems } = useContext(CartContext);
   const { wishlist, addToWishlist, removeFromWishlist } = useContext(WishlistContext);
 
   const [product, setProduct] = useState(null);
@@ -77,7 +77,23 @@ const ProductDetailPage = () => {
 
   const handleAddToCart = () => {
     if (!selectedSize) { setCartMsg("Please select a size."); return; }
-    if (!activeVariant || quantity > activeVariant.quantity) { setCartMsg("Selected variant is out of stock."); return; }
+    if (!activeVariant) { setCartMsg("Selected size/color combination is not available."); return; }
+    if (activeVariant.quantity === 0) { setCartMsg("This variant is out of stock."); return; }
+    if (quantity > activeVariant.quantity) {
+      setCartMsg(`Only ${activeVariant.quantity} unit${activeVariant.quantity > 1 ? "s" : ""} available.`);
+      return;
+    }
+
+    // Check if already in cart
+    const alreadyInCart = cartItems?.some(
+      i => i.id === product.id && i.activeVariant?.id === activeVariant.id
+    );
+    if (alreadyInCart) {
+      setCartMsg("This item is already in your cart!");
+      setTimeout(() => setCartMsg(""), 2500);
+      return;
+    }
+
     addToCart({ ...product, activeVariant, cartQuantity: quantity, price: activeVariant.price });
     setCartMsg("Added to cart!");
     setTimeout(() => setCartMsg(""), 2500);
@@ -284,20 +300,42 @@ const ProductDetailPage = () => {
                   <button key={v.size}
                     disabled={v.quantity === 0}
                     onClick={() => setSelectedSize(v.size)}
-                    className={`w-14 h-12 rounded-xl text-sm font-black transition-all ${
-                      v.quantity === 0 ? "bg-gray-50 text-gray-300 cursor-not-allowed line-through" :
-                      selectedSize === v.size ? "bg-gray-900 text-white shadow-lg scale-105" :
-                      "bg-white border border-gray-200 text-gray-700 hover:border-pink-400"
+                    className={`relative w-14 h-12 rounded-xl text-sm font-black transition-all ${
+                      v.quantity === 0
+                        ? "bg-gray-50 text-gray-300 cursor-not-allowed"
+                        : selectedSize === v.size
+                        ? "bg-gray-900 text-white shadow-lg scale-105"
+                        : "bg-white border border-gray-200 text-gray-700 hover:border-pink-400"
                     }`}
                   >
+                    {/* Diagonal strikethrough for out-of-stock */}
+                    {v.quantity === 0 && (
+                      <span className="absolute inset-0 flex items-center justify-center">
+                        <span className="absolute w-full h-px bg-gray-300 rotate-45 origin-center" />
+                      </span>
+                    )}
                     {v.size}
                   </button>
                 ))}
               </div>
-              {activeVariant?.low_stock && (
+
+              {/* Stock status messages */}
+              {activeVariant && activeVariant.quantity === 0 && (
                 <div className="flex items-center gap-2 text-red-600 bg-red-50 p-3 rounded-xl border border-red-100">
                   <AlertTriangle size={16} />
-                  <p className="text-xs font-bold">Only {activeVariant.quantity} left!</p>
+                  <p className="text-xs font-bold">This size is out of stock.</p>
+                </div>
+              )}
+              {activeVariant && activeVariant.quantity > 0 && activeVariant.low_stock && (
+                <div className="flex items-center gap-2 text-orange-600 bg-orange-50 p-3 rounded-xl border border-orange-100">
+                  <AlertTriangle size={16} />
+                  <p className="text-xs font-bold">Only {activeVariant.quantity} left — order soon!</p>
+                </div>
+              )}
+              {selectedSize && !activeVariant && (
+                <div className="flex items-center gap-2 text-gray-500 bg-gray-50 p-3 rounded-xl border border-gray-200">
+                  <AlertTriangle size={16} />
+                  <p className="text-xs font-bold">This combination is not available.</p>
                 </div>
               )}
             </div>
@@ -310,11 +348,19 @@ const ProductDetailPage = () => {
                 <button onClick={() => setQuantity(q => q + 1)} className="w-10 h-10 font-black flex items-center justify-center hover:bg-white rounded-xl transition">+</button>
               </div>
 
-              <button onClick={handleAddToCart}
-                className="flex-1 bg-pink-600 hover:bg-pink-700 text-white font-black rounded-2xl py-4 flex items-center justify-center gap-3 shadow-lg active:scale-95 transition-all">
-                <ShoppingCart size={20} />
-                Add to Cart
-              </button>
+              {/* Add to Cart — disabled when out of stock */}
+              {activeVariant && activeVariant.quantity === 0 ? (
+                <div className="flex-1 bg-gray-200 text-gray-500 font-black rounded-2xl py-4 flex items-center justify-center gap-3 cursor-not-allowed">
+                  <ShoppingCart size={20} />
+                  Out of Stock
+                </div>
+              ) : (
+                <button onClick={handleAddToCart}
+                  className="flex-1 bg-pink-600 hover:bg-pink-700 text-white font-black rounded-2xl py-4 flex items-center justify-center gap-3 shadow-lg active:scale-95 transition-all">
+                  <ShoppingCart size={20} />
+                  Add to Cart
+                </button>
+              )}
 
               <button onClick={handleWishlist}
                 className={`w-14 h-14 rounded-full border flex items-center justify-center transition-all active:scale-90 ${isWishlisted ? "bg-pink-50 border-pink-200 text-pink-600" : "bg-white border-gray-200 text-gray-400 hover:text-pink-600 hover:border-pink-200"}`}>
@@ -328,7 +374,13 @@ const ProductDetailPage = () => {
             </div>
 
             {cartMsg && (
-              <div className={`text-sm font-bold px-4 py-3 rounded-xl ${cartMsg.includes("Added") ? "bg-green-50 text-green-600" : "bg-red-50 text-red-600"}`}>
+              <div className={`text-sm font-bold px-4 py-3 rounded-xl ${
+                cartMsg.includes("Added")
+                  ? "bg-green-50 text-green-600 border border-green-200"
+                  : cartMsg.includes("already in your cart")
+                  ? "bg-blue-50 text-blue-600 border border-blue-200"
+                  : "bg-red-50 text-red-600 border border-red-200"
+              }`}>
                 {cartMsg}
               </div>
             )}

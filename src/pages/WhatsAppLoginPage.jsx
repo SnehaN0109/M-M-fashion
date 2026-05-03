@@ -1,11 +1,15 @@
-import { useState } from "react";
+import { useState, useContext } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { MessageCircle, Loader2, Mail, Phone } from "lucide-react";
+import { WishlistContext } from "../context/WishlistContext";
+import { CartContext } from "../context/CartContext";
 
 const WhatsAppLoginPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const redirectTo = location.state?.redirectTo || "/";
+  const { loadWishlistForUser } = useContext(WishlistContext);
+  const { loadCart } = useContext(CartContext);
 
   const [step, setStep] = useState("details"); // "details" | "otp" | "success"
   const [whatsappNumber, setWhatsappNumber] = useState("");
@@ -86,6 +90,40 @@ const WhatsAppLoginPage = () => {
       localStorage.setItem("user_id", data.user_id);
       localStorage.setItem("whatsapp_number", data.whatsapp_number);
       localStorage.setItem("email", data.email);
+
+      // ── Merge guest cart into DB cart ─────────────────────────────────────
+      // Read guest cart from localStorage before loadCart() clears it
+      const guestCartRaw = localStorage.getItem("guest_cart");
+      if (guestCartRaw) {
+        try {
+          const guestItems = JSON.parse(guestCartRaw);
+          const validGuest = guestItems.filter(i => i.activeVariant?.id && i.cartQuantity >= 1);
+          if (validGuest.length > 0) {
+            // Push each guest item to the DB cart (backend deduplicates)
+            await Promise.allSettled(
+              validGuest.map(item =>
+                fetch(`${import.meta.env.VITE_API_URL}/api/cart/add`, {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    whatsapp_number: data.whatsapp_number,
+                    variant_id: item.activeVariant.id,
+                    quantity: item.cartQuantity || 1,
+                  }),
+                })
+              )
+            );
+          }
+        } catch {
+          // silent — guest cart merge failure must never block login
+        }
+        // Clear guest cart now that it's been merged
+        localStorage.removeItem("guest_cart");
+      }
+
+      // Load this user's wishlist and cart (now includes merged guest items)
+      loadWishlistForUser();
+      loadCart();
 
       setStep("success");
       setTimeout(() => navigate(redirectTo), 1500);

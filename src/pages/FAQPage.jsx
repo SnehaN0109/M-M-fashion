@@ -8,7 +8,7 @@ const faqs = [
     items: [
       {
         q: "How do I place an order?",
-        a: "Browse our collection, add items to your cart, and proceed to checkout. You can pay via UPI, card, or cash on delivery.",
+        a: "Browse our collection, add items to your cart, and proceed to checkout. Pay securely via UPI.",
       },
       {
         q: "Can I modify or cancel my order after placing it?",
@@ -59,7 +59,7 @@ const faqs = [
     items: [
       {
         q: "What payment methods do you accept?",
-        a: "We accept UPI, debit/credit cards, net banking, and cash on delivery (COD) for eligible orders.",
+        a: "We accept UPI payments (GPay, PhonePe, Paytm, and any UPI app). Pay after placing your order and upload the screenshot for verification.",
       },
       {
         q: "Is it safe to pay on your website?",

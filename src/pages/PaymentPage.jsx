@@ -10,7 +10,7 @@ const PaymentPage = () => {
         </div>
         <h1 className="text-2xl font-black text-gray-900 mb-2">Payment Coming Soon</h1>
         <p className="text-gray-500 font-medium mb-8">
-          Online payment integration is under development. All orders are currently processed as Cash on Delivery.
+          UPI payment is available at checkout. Complete your payment after placing the order.
         </p>
         <Link
           to="/checkout"

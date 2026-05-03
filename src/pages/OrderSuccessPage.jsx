@@ -1,11 +1,14 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useLocation, Link } from "react-router-dom";
 import { CheckCircle, ShoppingBag, Truck, Home, Loader2, AlertCircle, Package } from "lucide-react";
+import PaymentInstructions from "../components/PaymentInstructions";
 
 const OrderSuccessPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const order_id = location.state?.order_id;
+  const paymentMethod = location.state?.paymentMethod || "UPI";
+  const totalFromNav = location.state?.total;
 
   const [order, setOrder] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -114,6 +117,15 @@ const OrderSuccessPage = () => {
             <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">Order ID</span>
             <span className="ml-2 text-lg font-black text-gray-900">#{order.order_id}</span>
           </div>
+
+          {/* Tracking Number Badge */}
+          {order.tracking_number && (
+            <div className="mt-3 inline-flex items-center gap-2 bg-blue-50 border border-blue-200 rounded-full px-6 py-2">
+              <span className="text-lg">🚚</span>
+              <span className="text-xs font-bold text-blue-500 uppercase tracking-wider">Tracking No.</span>
+              <span className="text-base font-black text-blue-700">{order.tracking_number}</span>
+            </div>
+          )}
         </div>
 
         <div className="grid lg:grid-cols-3 gap-6">
@@ -199,7 +211,13 @@ const OrderSuccessPage = () => {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-500">Payment</span>
-                  <span className="font-bold text-gray-900">Cash on Delivery</span>
+                  <span className="font-bold text-gray-900">UPI</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Tracking No.</span>
+                  <span className={`font-bold ${order.tracking_number ? 'text-blue-600' : 'text-gray-400'}`}>
+                    {order.tracking_number || 'Processing...'}
+                  </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-500">Estimated Delivery</span>
@@ -209,10 +227,12 @@ const OrderSuccessPage = () => {
                 </div>
               </div>
 
-              {/* COD Note */}
-              <div className="mt-6 bg-yellow-50 border border-yellow-100 rounded-xl p-3 text-xs text-yellow-800 font-medium">
-                💵 Cash on Delivery: Please keep the exact amount ready at delivery.
-              </div>
+              {/* UPI payment instructions — always shown */}
+              <PaymentInstructions
+                orderId={order.order_id}
+                totalAmount={order.total_amount || totalFromNav}
+                alreadyUploaded={!!order.payment_proof}
+              />
 
               {/* Actions */}
               <div className="mt-6 space-y-3">

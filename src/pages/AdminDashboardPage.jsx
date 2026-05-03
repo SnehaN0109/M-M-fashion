@@ -3,6 +3,7 @@ import {
   Package, ShoppingBag, Tag, Image, Plus, Trash2, Pencil,
   CheckCircle, XCircle, Loader2, ChevronDown, RefreshCw, Settings
 } from "lucide-react";
+import PaymentActions from "../components/admin/PaymentActions";
 
 const API = `${import.meta.env.VITE_API_URL}/api/admin`;
 
@@ -429,14 +430,39 @@ const OrdersTab = () => {
   };
   useEffect(load, [statusFilter]);
 
+  // Save order/tracking status — updates list in-place, no full reload
   const updateStatus = async (orderId, status, paymentStatus, tracking) => {
     setUpdating(orderId);
-    await adminFetch(`${API}/orders/${orderId}/status`, {
+    const res = await adminFetch(`${API}/orders/${orderId}/status`, {
       method: "PUT",
       body: JSON.stringify({ status, payment_status: paymentStatus, tracking_number: tracking || undefined })
     });
+    if (res.ok) {
+      setOrders(prev => prev.map(o =>
+        o.id === orderId
+          ? { ...o, status, payment_status: paymentStatus, tracking_number: tracking || o.tracking_number }
+          : o
+      ));
+    }
     setUpdating(null);
-    load();
+  };
+
+  // Called by PaymentActions after verify — update payment_status + order status in-place
+  const handlePaymentVerified = (orderId, newPaymentStatus, newOrderStatus) => {
+    setOrders(prev => prev.map(o =>
+      o.id === orderId
+        ? { ...o, payment_status: newPaymentStatus || 'VERIFIED', status: newOrderStatus || 'PLACED' }
+        : o
+    ));
+  };
+
+  // Called by PaymentActions after reject — update payment_status in-place
+  const handlePaymentRejected = (orderId, newPaymentStatus) => {
+    setOrders(prev => prev.map(o =>
+      o.id === orderId
+        ? { ...o, payment_status: newPaymentStatus || 'FAILED' }
+        : o
+    ));
   };
 
   return (
@@ -458,7 +484,14 @@ const OrdersTab = () => {
       ) : (
         <div className="space-y-4">
           {orders.map(o => (
-            <OrderRow key={o.id} order={o} updating={updating} onUpdate={updateStatus} />
+            <OrderRow
+              key={o.id}
+              order={o}
+              updating={updating}
+              onUpdate={updateStatus}
+              onPaymentVerified={handlePaymentVerified}
+              onPaymentRejected={handlePaymentRejected}
+            />
           ))}
           {orders.length === 0 && <p className="text-center text-gray-400 py-10">No orders found.</p>}
         </div>
@@ -467,21 +500,28 @@ const OrdersTab = () => {
   );
 };
 
-const OrderRow = ({ order, updating, onUpdate }) => {
+const OrderRow = ({ order, updating, onUpdate, onPaymentVerified, onPaymentRejected }) => {
   const [open, setOpen] = useState(false);
   const [newStatus, setNewStatus] = useState((order.status || "PENDING_PAYMENT").toUpperCase());
   const [newPaymentStatus, setNewPaymentStatus] = useState((order.payment_status || "PENDING").toUpperCase());
   const [tracking, setTracking] = useState(order.tracking_number || "");
 
+  // Keep local selects in sync when parent updates the order object
+  // (e.g. after PaymentActions verify/reject)
+  const currentStatus = (order.status || "PENDING_PAYMENT").toUpperCase();
+  const currentPaymentStatus = (order.payment_status || "PENDING").toUpperCase();
+
   return (
     <div className="border rounded-2xl overflow-hidden">
+      {/* ── Collapsed header ── */}
       <div className="flex items-center justify-between px-5 py-4 cursor-pointer hover:bg-gray-50" onClick={() => setOpen(!open)}>
         <div className="flex items-center gap-4 flex-wrap">
           <span className="font-black text-gray-900">#{order.id}</span>
           <span className="text-sm text-gray-600">{order.customer_name}</span>
           <span className="text-sm text-gray-400">{order.customer_phone}</span>
-          <Badge status={order.status} />
-          <PaymentBadge status={order.payment_status} />
+          {/* Badges always reflect the live order object from parent */}
+          <Badge status={currentStatus} />
+          <PaymentBadge status={currentPaymentStatus} />
         </div>
         <div className="flex items-center gap-4">
           <span className="font-black text-gray-900">₹{order.total_amount?.toLocaleString()}</span>
@@ -489,45 +529,64 @@ const OrderRow = ({ order, updating, onUpdate }) => {
         </div>
       </div>
 
+      {/* ── Expanded detail ── */}
       {open && (
         <div className="border-t px-5 py-4 bg-gray-50 space-y-4">
+
+          {/* Order meta */}
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
             <div><p className="text-xs text-gray-400 font-black uppercase">Email</p><p>{order.customer_email}</p></div>
-            <div><p className="text-xs text-gray-400 font-black uppercase">Payment</p><p>{order.payment_method}</p></div>
+            <div><p className="text-xs text-gray-400 font-black uppercase">Payment Method</p><p>{order.payment_method}</p></div>
             <div><p className="text-xs text-gray-400 font-black uppercase">Domain</p><p>{order.domain_origin}</p></div>
             <div><p className="text-xs text-gray-400 font-black uppercase">Date</p><p>{new Date(order.created_at).toLocaleDateString("en-IN")}</p></div>
             <div><p className="text-xs text-gray-400 font-black uppercase">Items</p><p>{order.items?.length} item(s)</p></div>
+            <div><p className="text-xs text-gray-400 font-black uppercase">Total</p><p className="font-black">₹{order.total_amount?.toLocaleString()}</p></div>
           </div>
 
-          <div className="flex gap-3 flex-wrap items-end">
-            <div>
-              <label className="text-xs font-black text-gray-400 uppercase tracking-widest block mb-1">Update Status</label>
-              <select value={newStatus} onChange={e => setNewStatus(e.target.value)}
-                className="border rounded-xl px-3 py-2 text-sm focus:outline-none">
-                {STATUS_OPTIONS.map(s => <option key={s} value={s}>{s.replace(/_/g, " ")}</option>)}
-              </select>
+          {/* ── Payment Actions panel ── */}
+          <PaymentActions
+            order={order}
+            onVerify={onPaymentVerified}
+            onReject={onPaymentRejected}
+          />
+
+          {/* ── Manual status override ── */}
+          <details className="group">
+            <summary className="text-xs font-black text-gray-400 uppercase tracking-widest cursor-pointer select-none list-none flex items-center gap-1 hover:text-gray-600">
+              <ChevronDown size={13} className="transition-transform group-open:rotate-180" />
+              Manual Status Override
+            </summary>
+            <div className="mt-3 flex gap-3 flex-wrap items-end">
+              <div>
+                <label className="text-xs font-black text-gray-400 uppercase tracking-widest block mb-1">Order Status</label>
+                <select value={newStatus} onChange={e => setNewStatus(e.target.value)}
+                  className="border rounded-xl px-3 py-2 text-sm focus:outline-none">
+                  {STATUS_OPTIONS.map(s => <option key={s} value={s}>{s.replace(/_/g, " ")}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="text-xs font-black text-gray-400 uppercase tracking-widest block mb-1">Payment Status</label>
+                <select value={newPaymentStatus} onChange={e => setNewPaymentStatus(e.target.value)}
+                  className="border rounded-xl px-3 py-2 text-sm focus:outline-none">
+                  {PAYMENT_STATUS_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="text-xs font-black text-gray-400 uppercase tracking-widest block mb-1">Tracking Number</label>
+                <input value={tracking} onChange={e => setTracking(e.target.value)}
+                  placeholder="e.g. DTDC123456"
+                  className="border rounded-xl px-3 py-2 text-sm focus:outline-none w-48" />
+              </div>
+              <button
+                onClick={() => onUpdate(order.id, newStatus, newPaymentStatus, tracking)}
+                disabled={updating === order.id}
+                className="px-5 py-2 bg-gray-900 text-white font-bold rounded-xl text-sm disabled:opacity-50 flex items-center gap-2"
+              >
+                {updating === order.id && <Loader2 size={13} className="animate-spin" />} Save
+              </button>
             </div>
-            <div>
-              <label className="text-xs font-black text-gray-400 uppercase tracking-widest block mb-1">Payment Status</label>
-              <select value={newPaymentStatus} onChange={e => setNewPaymentStatus(e.target.value)}
-                className="border rounded-xl px-3 py-2 text-sm focus:outline-none">
-                {PAYMENT_STATUS_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="text-xs font-black text-gray-400 uppercase tracking-widest block mb-1">Tracking Number</label>
-              <input value={tracking} onChange={e => setTracking(e.target.value)}
-                placeholder="e.g. DTDC123456"
-                className="border rounded-xl px-3 py-2 text-sm focus:outline-none w-48" />
-            </div>
-            <button
-              onClick={() => onUpdate(order.id, newStatus, newPaymentStatus, tracking)}
-              disabled={updating === order.id}
-              className="px-5 py-2 bg-gray-900 text-white font-bold rounded-xl text-sm disabled:opacity-50 flex items-center gap-2"
-            >
-              {updating === order.id && <Loader2 size={13} className="animate-spin" />} Save
-            </button>
-          </div>
+          </details>
+
         </div>
       )}
     </div>

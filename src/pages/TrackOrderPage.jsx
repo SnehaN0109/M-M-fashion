@@ -121,12 +121,24 @@ const TrackOrderPage = () => {
       </div>
 
       {/* Tracking Number */}
-      {order.tracking_number && currentStep >= STATUS_INDEX["SHIPPED"] && (
+      {order.tracking_number ? (
         <div className="bg-blue-50 border border-blue-100 rounded-2xl p-5 mb-6 flex items-center gap-3">
           <Truck size={20} className="text-blue-500 flex-shrink-0" />
           <div>
-            <p className="text-xs font-black text-blue-400 uppercase tracking-widest">Shipped via Speed Post</p>
-            <p className="font-black text-blue-700 text-lg">Tracking ID: {order.tracking_number}</p>
+            <p className="text-xs font-black text-blue-400 uppercase tracking-widest">Tracking Number</p>
+            <p className="font-black text-blue-700 text-lg">{order.tracking_number}</p>
+          </div>
+        </div>
+      ) : (
+        <div className="bg-gray-50 border border-gray-200 rounded-2xl p-5 mb-6 flex items-center gap-3">
+          <Package size={20} className="text-gray-400 flex-shrink-0" />
+          <div>
+            <p className="text-xs font-black text-gray-400 uppercase tracking-widest">Tracking Number</p>
+            <p className="font-bold text-gray-500">
+              {(order.payment_status || '').toUpperCase() === 'PENDING'
+                ? 'Awaiting payment verification...'
+                : 'Processing...'}
+            </p>
           </div>
         </div>
       )}
@@ -141,7 +153,7 @@ const TrackOrderPage = () => {
           </div>
           <div>
             <p className="text-xs text-gray-400 font-black uppercase tracking-widest">Payment</p>
-            <p className="font-bold text-gray-900 mt-0.5">{order.payment_method || "COD"}</p>
+            <p className="font-bold text-gray-900 mt-0.5">{order.payment_method || "UPI"}</p>
           </div>
           <div>
             <p className="text-xs text-gray-400 font-black uppercase tracking-widest">Items</p>

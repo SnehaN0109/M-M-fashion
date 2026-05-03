@@ -1,104 +1,124 @@
 """
-WhatsApp Business API integration for sending OTPs.
-This is a template - you need to configure with your WhatsApp Business API credentials.
+WhatsApp integration for M&M Fashion — powered by Twilio.
+
+Credentials required in backend/.env:
+  TWILIO_ACCOUNT_SID      — from https://console.twilio.com
+  TWILIO_AUTH_TOKEN       — from https://console.twilio.com
+  TWILIO_WHATSAPP_FROM    — e.g. whatsapp:+14155238886 (Twilio sandbox number)
 """
-import requests
 import os
-from typing import Optional
+from datetime import datetime
 
-class WhatsAppService:
-    def __init__(self):
-        # These need to be added to your .env file
-        self.access_token = os.getenv('WHATSAPP_ACCESS_TOKEN')
-        self.phone_number_id = os.getenv('WHATSAPP_PHONE_NUMBER_ID')
-        self.base_url = "https://graph.facebook.com/v18.0"
-        
-    def send_otp_message(self, whatsapp_number: str, otp: str) -> bool:
-        """
-        Send OTP via WhatsApp Business API.
-        Returns True if successful, False otherwise.
-        """
-        if not self.access_token or not self.phone_number_id:
-            print("❌ WhatsApp credentials not configured. Using console OTP.")
-            return False
-            
-        # Format phone number (remove +91 if present, add 91)
-        formatted_number = whatsapp_number.replace('+', '').replace(' ', '')
-        if not formatted_number.startswith('91'):
-            formatted_number = '91' + formatted_number
-            
-        url = f"{self.base_url}/{self.phone_number_id}/messages"
-        
-        headers = {
-            'Authorization': f'Bearer {self.access_token}',
-            'Content-Type': 'application/json'
-        }
-        
-        # WhatsApp message payload
-        payload = {
-            "messaging_product": "whatsapp",
-            "to": formatted_number,
-            "type": "template",
-            "template": {
-                "name": "otp_verification",  # You need to create this template
-                "language": {
-                    "code": "en"
-                },
-                "components": [
-                    {
-                        "type": "body",
-                        "parameters": [
-                            {
-                                "type": "text",
-                                "text": otp
-                            }
-                        ]
-                    }
-                ]
-            }
-        }
-        
-        try:
-            response = requests.post(url, json=payload, headers=headers)
-            
-            if response.status_code == 200:
-                print(f"✅ OTP sent to WhatsApp: {whatsapp_number}")
-                return True
-            else:
-                print(f"❌ WhatsApp API Error: {response.status_code} - {response.text}")
-                return False
-                
-        except Exception as e:
-            print(f"❌ WhatsApp sending failed: {str(e)}")
-            return False
 
-# Alternative: Simple SMS service (like Twilio)
-class SMSService:
-    def __init__(self):
-        self.account_sid = os.getenv('TWILIO_ACCOUNT_SID')
-        self.auth_token = os.getenv('TWILIO_AUTH_TOKEN')
-        self.from_number = os.getenv('TWILIO_FROM_NUMBER')
-        
-    def send_otp_sms(self, phone_number: str, otp: str) -> bool:
-        """Send OTP via SMS using Twilio."""
-        try:
-            from twilio.rest import Client
-            
-            if not all([self.account_sid, self.auth_token, self.from_number]):
-                print("❌ Twilio credentials not configured.")
-                return False
-                
-            client = Client(self.account_sid, self.auth_token)
-            
-            message = client.messages.create(
-                body=f"Your M&M Fashion OTP is: {otp}. Valid for 10 minutes.",
-                from_=self.from_number,
-                to=f"+91{phone_number}"
-            )
-            
-            print(f"✅ SMS sent via Twilio: {message.sid}")
-            return True
-            
-        except Exception as e:
-            print(f"❌ SMS sending failed: {str(e)}")
-            return False
+# ── Phone normalisation ───────────────────────────────────────────────────────
+
+def _format_phone(raw: str) -> str:
+    """
+    Normalise any Indian phone number to E.164 digits without '+'.
+    '9876543210'       -> '919876543210'
+    '+91 98765 43210'  -> '919876543210'
+    '919876543210'     -> '919876543210'
+    """
+    digits = "".join(c for c in raw if c.isdigit())
+    if len(digits) == 10:
+        return "91" + digits
+    if len(digits) == 12 and digits.startswith("91"):
+        return digits
+    return digits  # fallback — let Twilio surface the error
+
+
+# ── Message builder ───────────────────────────────────────────────────────────
+
+def build_order_confirmation(order) -> str:
+    """Build a human-readable order confirmation from an Order model instance."""
+    now = datetime.utcnow()
+    date_str = now.strftime("%d %b %Y, %I:%M %p") + " UTC"
+
+    item_lines = []
+    for item in order.items:
+        variant = item.variant
+        name    = variant.product.name if variant and variant.product else "Item"
+        qty     = item.quantity
+        price   = float(item.price_at_purchase) * qty
+        item_lines.append(f"  • {name} x{qty} — Rs.{price:,.0f}")
+
+    items_block = "\n".join(item_lines) if item_lines else "  (no items)"
+
+    return "\n".join([
+        "Order Confirmed!",
+        "",
+        f"Order ID       : #{order.id}",
+        f"Tracking No.   : {order.tracking_number or 'Generating...'}",
+        f"Status         : {order.status.replace('_', ' ').title()}",
+        "",
+        "Items Ordered:",
+        items_block,
+        "",
+        f"Total    : Rs.{float(order.total_amount):,.0f}",
+        f"Payment  : {order.payment_method}",
+        f"Date     : {date_str}",
+        "",
+        "Thank you for shopping with M&M Fashion!",
+        "We'll notify you when your order is shipped.",
+    ])
+
+
+# ── Core send ─────────────────────────────────────────────────────────────────
+
+def send_whatsapp_text(to_number: str, message: str) -> dict:
+    """
+    Send a WhatsApp message via Twilio.
+
+    Args:
+        to_number : raw phone number (will be normalised to E.164)
+        message   : plain text body
+
+    Returns:
+        dict — { success: bool, sid: str|None, detail: str }
+    """
+    account_sid = os.getenv("TWILIO_ACCOUNT_SID", "").strip()
+    auth_token  = os.getenv("TWILIO_AUTH_TOKEN",  "").strip()
+    from_number = os.getenv("TWILIO_WHATSAPP_FROM", "").strip()
+
+    if not account_sid or not auth_token or not from_number:
+        print("[WhatsApp] Twilio credentials not configured — skipping send.")
+        return {"success": False, "sid": None, "detail": "credentials_not_configured"}
+
+    phone     = _format_phone(to_number)
+    to_wa     = f"whatsapp:+{phone}"
+
+    try:
+        from twilio.rest import Client
+        client = Client(account_sid, auth_token)
+        msg = client.messages.create(
+            from_=from_number,
+            to=to_wa,
+            body=message,
+        )
+        print("[WhatsApp] Sent to {} - SID: {}".format(to_wa, msg.sid))
+        return {"success": True, "sid": msg.sid, "detail": "sent"}
+
+    except Exception as e:
+        print("[WhatsApp] Error: {}".format(str(e).encode("ascii", "replace").decode("ascii")))
+        return {"success": False, "sid": None, "detail": str(e)}
+
+
+# ── Convenience wrapper ───────────────────────────────────────────────────────
+
+def send_order_confirmation(order) -> dict:
+    """
+    Send an order confirmation WhatsApp to the customer.
+    Resolves phone from order.customer_phone, falling back to linked user.
+    Always returns a result dict — never raises.
+    """
+    # Resolve phone: prefer customer_phone on order, fall back to linked user
+    phone = (order.customer_phone or "").strip()
+    if not phone and order.user:
+        phone = (order.user.whatsapp_number or "").strip()
+
+    if not phone:
+        print("[WhatsApp] No phone number for order #{} - skipping.".format(order.id))
+        return {"success": False, "sid": None, "detail": "no_phone_on_order"}
+
+    message = build_order_confirmation(order)
+    return send_whatsapp_text(phone, message)

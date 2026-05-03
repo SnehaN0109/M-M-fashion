@@ -25,6 +25,7 @@ def save_product_image(file):
 
 @products_bp.route('/', methods=['GET'], strict_slashes=False)
 def get_products():
+    print("DEBUG: get_products called!")
     domain = request.args.get('domain', 'garba.shop')
     category = request.args.get('category')
     size = request.args.get('size')
@@ -41,7 +42,7 @@ def get_products():
     if search:
         query = query.filter(Product.name.ilike(f"%{search}%"))
     if category:
-        query = query.filter_by(category=category)
+        query = query.filter(Product.category.ilike(category))
 
     products = query.all()
     result = []

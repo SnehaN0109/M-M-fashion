@@ -25,11 +25,19 @@ export const CartProvider = ({ children }) => {
   const [cartItems, setCartItems] = useState(() => {
     const wa = localStorage.getItem("whatsapp_number");
     if (!wa) {
+      // Guest: load from guest_cart (no user logged in)
       const guestCart = localStorage.getItem("guest_cart");
       if (guestCart) {
-        try { return JSON.parse(guestCart); } catch {}
+        try {
+          const parsed = JSON.parse(guestCart);
+          return parsed.filter(item => item.activeVariant?.id).map(item => ({
+            ...item,
+            cartQuantity: item.cartQuantity || 1,
+          }));
+        } catch {}
       }
     }
+    // Logged-in user: start empty — loadCart() will populate from DB
     return [];
   });
   const [cartLoading, setCartLoading] = useState(false);
@@ -75,37 +83,40 @@ export const CartProvider = ({ children }) => {
 
   useEffect(() => { loadCart(); }, [loadCart]);
 
-  // Sync guest cart to localStorage
+  // Sync guest cart to localStorage (only when not logged in)
   useEffect(() => {
     const wa = whatsapp();
     if (!wa) {
       localStorage.setItem("guest_cart", JSON.stringify(cartItems));
     }
+    // When logged in, cart lives in DB — don't write to localStorage
   }, [cartItems]);
 
   // ── Add to cart ────────────────────────────────────────────────────────────
+  // Returns { added: true } if new item, { duplicate: true } if already in cart
   const addToCart = async (product) => {
     const wa = whatsapp();
     const variantId = product.activeVariant?.id;
 
-    // Optimistic update first so UI feels instant
-    setCartItems(prev => {
-      const existing = prev.find(
-        i => i.id === product.id && i.activeVariant?.id === variantId
-      );
-      if (existing) {
-        return prev.map(i =>
-          i.id === product.id && i.activeVariant?.id === variantId
-            ? { ...i, cartQuantity: i.cartQuantity + (product.cartQuantity || 1) }
-            : i
-        );
-      }
-      return [...prev, {
+    // Check if this exact variant is already in cart
+    const isDuplicate = cartItems.some(
+      i => i.id === product.id && i.activeVariant?.id === variantId
+    );
+
+    if (isDuplicate) {
+      // Do NOT add again — caller should show "already in cart" message
+      return { duplicate: true };
+    }
+
+    // Optimistic update — add as new item
+    setCartItems(prev => [
+      ...prev,
+      {
         ...product,
         cartId: Date.now() + Math.random(),
         cartQuantity: product.cartQuantity || 1,
-      }];
-    });
+      },
+    ]);
 
     // Sync to DB if logged in
     if (wa && variantId) {
@@ -123,6 +134,8 @@ export const CartProvider = ({ children }) => {
         // silent — cart is still updated in context
       }
     }
+
+    return { added: true };
   };
 
   // ── Remove from cart ───────────────────────────────────────────────────────
@@ -186,6 +199,36 @@ export const CartProvider = ({ children }) => {
     }
   };
 
+  // ── Remove only specific ordered items (called after selective checkout) ──
+  const removeOrderedItems = async (orderedVariantIds) => {
+    // orderedVariantIds: array of variant IDs that were ordered
+    setCartItems(prev =>
+      prev.filter(i => !orderedVariantIds.includes(i.activeVariant?.id))
+    );
+
+    const wa = whatsapp();
+    if (wa) {
+      // Remove each ordered item from DB cart individually
+      for (const variantId of orderedVariantIds) {
+        try {
+          await fetch(`${API}/cart/remove`, {
+            method: "DELETE",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ whatsapp_number: wa, variant_id: variantId }),
+          });
+        } catch {
+          // silent
+        }
+      }
+    }
+  };
+
+  // ── Reset cart in memory (called on logout) ───────────────────────────────
+  // Does NOT touch the DB — the DB cart is preserved for next login.
+  const resetCart = () => {
+    setCartItems([]);
+  };
+
   // ── Clear cart (called after order placed) ─────────────────────────────────
   const clearCart = async () => {
     setCartItems([]);
@@ -205,7 +248,7 @@ export const CartProvider = ({ children }) => {
 
   return (
     <CartContext.Provider
-      value={{ cartItems, cartLoading, addToCart, removeFromCart, updateQuantity, clearCart, loadCart }}
+      value={{ cartItems, cartLoading, addToCart, removeFromCart, updateQuantity, clearCart, removeOrderedItems, resetCart, loadCart }}
     >
       {children}
     </CartContext.Provider>

@@ -9,6 +9,7 @@ const ProductCard = ({ product }) => {
   const { wishlist, addToWishlist, removeFromWishlist } = useContext(WishlistContext);
   const { addToCart } = useContext(CartContext);
   const [showMessage, setShowMessage] = useState(false);
+  const [cartToast, setCartToast] = useState(null); // "added" | "already" | null
 
   const isLiked = wishlist.some((item) => item.id === product.id);
 
@@ -18,6 +19,7 @@ const ProductCard = ({ product }) => {
       removeFromWishlist(product.id);
     } else {
       addToWishlist(product);
+      setCartToast(null); // ensure wishlist toast shows
       setShowMessage(true);
       setTimeout(() => setShowMessage(false), 2000);
     }
@@ -122,13 +124,17 @@ const ProductCard = ({ product }) => {
             
             {/* Quick Add Button */}
             <button
-               onClick={(e) => {
+               onClick={async (e) => {
                  e.stopPropagation();
-                 const firstVar = product.variants?.[0];
+                 // Pick first in-stock variant; fall back to first variant if all OOS
+                 const inStock = product.variants?.find(v => v.quantity > 0);
+                 const firstVar = inStock || product.variants?.[0];
                  if (firstVar) {
-                   addToCart({ ...product, activeVariant: firstVar, price: firstVar.price });
+                   const result = await addToCart({ ...product, activeVariant: firstVar, price: firstVar.price, cartQuantity: 1 });
                    setShowMessage(true);
-                   setTimeout(() => setShowMessage(false), 2000);
+                   // showMessage is reused for both wishlist and cart — set a specific message
+                   setCartToast(result?.duplicate ? "already" : "added");
+                   setTimeout(() => { setShowMessage(false); setCartToast(null); }, 2000);
                  }
                }}
                className="bg-pink-600 text-white p-3 rounded-xl shadow-lg hover:bg-black transition-all active:scale-90 flex items-center justify-center"
@@ -139,13 +145,25 @@ const ProductCard = ({ product }) => {
         </div>
       </div>
 
-      {/* Persistence Notification */}
+      {/* Notification Toast */}
       {showMessage && (
         <div className="fixed top-12 left-1/2 -translate-x-1/2 z-[60] animate-bounce">
-           <div className="bg-gray-900 text-white px-8 py-3 rounded-2xl shadow-2xl flex items-center gap-3">
-             <FaHeart className="text-pink-500" />
-             <span className="font-bold text-sm tracking-tight">Saved to wish list</span>
-           </div>
+          {cartToast === "added" ? (
+            <div className="bg-gray-900 text-white px-8 py-3 rounded-2xl shadow-2xl flex items-center gap-3">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M20 6L9 17l-5-5"/></svg>
+              <span className="font-bold text-sm tracking-tight">Added to cart!</span>
+            </div>
+          ) : cartToast === "already" ? (
+            <div className="bg-blue-600 text-white px-8 py-3 rounded-2xl shadow-2xl flex items-center gap-3">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="12" cy="12" r="10"/><path d="M12 8v4m0 4h.01"/></svg>
+              <span className="font-bold text-sm tracking-tight">Already in your cart!</span>
+            </div>
+          ) : (
+            <div className="bg-gray-900 text-white px-8 py-3 rounded-2xl shadow-2xl flex items-center gap-3">
+              <FaHeart className="text-pink-500" />
+              <span className="font-bold text-sm tracking-tight">Saved to wish list</span>
+            </div>
+          )}
         </div>
       )}
     </>

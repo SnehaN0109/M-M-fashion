@@ -6,6 +6,7 @@ from functools import wraps
 import jwt as pyjwt
 import datetime
 from models import db, Product, ProductVariant, ProductImage, UserPhoto, DiscountCode, Order, SiteSetting, User
+from utils import assign_tracking_number
 
 # ─── Upload helpers ────────────────────────────────────────────────────────────
 PRODUCT_UPLOAD_FOLDER = os.path.join(os.path.dirname(__file__), '..', 'uploads', 'products')
@@ -26,28 +27,7 @@ admin_bp = Blueprint('admin', __name__)
 
 # ─── Auth decorator ───────────────────────────────────────────────────────────
 
-def admin_required(f):
-    """Verify JWT admin token on every protected admin route."""
-    @wraps(f)
-    def decorated(*args, **kwargs):
-        auth_header = request.headers.get('Authorization', '')
-        if not auth_header.startswith('Bearer '):
-            return jsonify({"error": "Missing or invalid Authorization header"}), 401
-        token = auth_header.split(' ', 1)[1]
-        try:
-            payload = pyjwt.decode(
-                token,
-                current_app.config['SECRET_KEY'],
-                algorithms=['HS256']
-            )
-            if payload.get('role') != 'admin':
-                return jsonify({"error": "Admin access required"}), 403
-        except pyjwt.ExpiredSignatureError:
-            return jsonify({"error": "Session expired. Please log in again."}), 401
-        except pyjwt.InvalidTokenError:
-            return jsonify({"error": "Invalid token"}), 401
-        return f(*args, **kwargs)
-    return decorated
+from auth_decorators import admin_required
 
 
 # ─── Auth ─────────────────────────────────────────────────────────────────────
@@ -227,6 +207,8 @@ def list_orders():
             "total_amount": o.total_amount,
             "status": o.status,
             "payment_method": o.payment_method,
+            "payment_status": o.payment_status,
+            "payment_proof": o.payment_proof,
             "domain_origin": o.domain_origin,
             "tracking_number": o.tracking_number,
             "business_name": o.business_name,
@@ -263,12 +245,23 @@ def update_order_status(order_id):
         o.status = new_status
     if new_payment_status:
         o.payment_status = new_payment_status
-        
+
     if data.get('tracking_number') is not None:
         o.tracking_number = data.get('tracking_number')
-        
+
+    # Auto-generate tracking number if order is being moved to an active status
+    # and doesn't already have one (and admin hasn't provided one manually)
+    ACTIVE_STATUSES = {'PLACED', 'PACKED', 'SHIPPED', 'OUT_FOR_DELIVERY', 'DELIVERED'}
+    if new_status and new_status.upper() in ACTIVE_STATUSES and not data.get('tracking_number'):
+        assign_tracking_number(o, db.session)
+
     db.session.commit()
-    return jsonify({"message": "Order status updated", "status": o.status, "payment_status": o.payment_status})
+    return jsonify({
+        "message": "Order status updated",
+        "status": o.status,
+        "payment_status": o.payment_status,
+        "tracking_number": o.tracking_number,
+    })
 
 
 # ─── Discount Codes ───────────────────────────────────────────────────────────

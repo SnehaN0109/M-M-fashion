@@ -1,33 +1,77 @@
-import { createContext, useState, useEffect } from "react";
+import { createContext, useState, useCallback } from "react";
 
 export const WishlistContext = createContext();
 
+const API = `${import.meta.env.VITE_API_URL}/api`;
+
+const whatsapp = () => localStorage.getItem("whatsapp_number");
+
 export const WishlistProvider = ({ children }) => {
-  // Load wishlist from localStorage when app starts
-  const [wishlist, setWishlist] = useState(() => {
-    const savedWishlist = localStorage.getItem("wishlist");
-    return savedWishlist ? JSON.parse(savedWishlist) : [];
-  });
+  // wishlist items — shape: [{ id, name, image_url, category, ... }]
+  const [wishlist, setWishlist] = useState([]);
 
-  // Save wishlist to localStorage whenever it changes
-  useEffect(() => {
-    localStorage.setItem("wishlist", JSON.stringify(wishlist));
-  }, [wishlist]);
+  // ── Load from DB (called on login and on mount if logged in) ──────────────
+  const loadWishlistForUser = useCallback(async () => {
+    const wa = whatsapp();
+    if (!wa) {
+      setWishlist([]);
+      return;
+    }
+    try {
+      const res = await fetch(`${API}/wishlist?whatsapp_number=${encodeURIComponent(wa)}`);
+      if (!res.ok) return;
+      const data = await res.json();
+      setWishlist(data);
+    } catch {
+      // network error — keep current state
+    }
+  }, []);
 
-  // Add product to wishlist (NO POPUP MESSAGE)
-  const addToWishlist = (product) => {
-    const exists = wishlist.some((item) => item.id === product.id);
+  // ── Add to wishlist ───────────────────────────────────────────────────────
+  const addToWishlist = async (product) => {
+    // Optimistic update
+    setWishlist(prev =>
+      prev.some(i => i.id === product.id) ? prev : [...prev, product]
+    );
 
-    if (!exists) {
-      setWishlist((prevWishlist) => [...prevWishlist, product]);
+    const wa = whatsapp();
+    if (!wa) return; // guest — localStorage only (no DB for guests)
+
+    try {
+      await fetch(`${API}/wishlist`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          whatsapp_number: wa,
+          product_id: product.id,
+        }),
+      });
+    } catch {
+      // silent — optimistic update stays
     }
   };
 
-  // Remove product from wishlist
-  const removeFromWishlist = (id) => {
-    setWishlist((prevWishlist) =>
-      prevWishlist.filter((item) => item.id !== id)
-    );
+  // ── Remove from wishlist ──────────────────────────────────────────────────
+  const removeFromWishlist = async (productId) => {
+    // Optimistic update
+    setWishlist(prev => prev.filter(i => i.id !== productId));
+
+    const wa = whatsapp();
+    if (!wa) return;
+
+    try {
+      await fetch(`${API}/wishlist/${productId}?whatsapp_number=${encodeURIComponent(wa)}`, {
+        method: "DELETE",
+      });
+    } catch {
+      // silent
+    }
+  };
+
+  // ── Clear in-memory state on logout ──────────────────────────────────────
+  // DB data is preserved — restored on next login via loadWishlistForUser()
+  const clearWishlist = () => {
+    setWishlist([]);
   };
 
   return (
@@ -36,6 +80,8 @@ export const WishlistProvider = ({ children }) => {
         wishlist,
         addToWishlist,
         removeFromWishlist,
+        clearWishlist,
+        loadWishlistForUser,
       }}
     >
       {children}

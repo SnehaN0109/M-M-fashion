@@ -121,10 +121,15 @@ const MyOrdersPage = () => {
                         <CreditCard size={14} />
                         <span>{order.payment_method}</span>
                       </div>
-                      {order.tracking_number && (
+                      {order.tracking_number ? (
                         <div className="flex items-center gap-1.5 text-blue-600 font-bold">
                           <Package size={14} />
                           <span>Tracking: {order.tracking_number}</span>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-1.5 text-gray-400">
+                          <Package size={14} />
+                          <span>Tracking: {(order.payment_status || '').toUpperCase() === 'PENDING' ? 'Awaiting payment...' : 'Processing...'}</span>
                         </div>
                       )}
                     </div>

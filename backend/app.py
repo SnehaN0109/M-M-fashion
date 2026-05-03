@@ -3,32 +3,27 @@ from flask_cors import CORS
 from flask_mail import Mail
 from config import Config
 from models import db
-from sqlalchemy import text
 import os
+
+# Absolute path to the backend directory — used for all file serving
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+UPLOADS_DIR = os.path.join(BASE_DIR, 'uploads')
 
 
 def create_app():
     app = Flask(__name__)
     app.config.from_object(Config)
 
-    CORS(app, resources={r"/api/*": {
-        "origins": [
-            "http://localhost:5173",
-            "http://localhost:5174",
-            "http://localhost:5175",
-            "http://localhost:5176",
-            "https://garba.shop",
-            "https://ttd.in"
-        ],
-        "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
-    }})
+    # Allow all origins for both API routes and static upload files
+    CORS(app, resources={
+        r"/api/*":     {"origins": "*", "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"]},
+        r"/uploads/*": {"origins": "*", "methods": ["GET", "OPTIONS"]},
+    })
 
     db.init_app(app)
-    
+
     # Initialize Flask-Mail
     mail = Mail(app)
-    
-    # Make mail available to other modules
     app.mail = mail
 
     # ── Register Blueprints ──────────────────────────────────────────────────
@@ -37,35 +32,31 @@ def create_app():
     from routes.auth import auth_bp
     from routes.orders import orders_bp
     from routes.cart_orders import cart_orders_bp
+    from routes.payment import payment_bp
+    from routes.wishlist import wishlist_bp
 
     app.register_blueprint(products_bp, url_prefix='/api/products')
     app.register_blueprint(admin_bp, url_prefix='/api/admin')
     app.register_blueprint(auth_bp, url_prefix='/api/auth')
     app.register_blueprint(orders_bp, url_prefix='/api/orders')
     app.register_blueprint(cart_orders_bp, url_prefix='/api')
+    app.register_blueprint(payment_bp)
+    app.register_blueprint(wishlist_bp, url_prefix='/api')
 
-    # ── Health check ─────────────────────────────────────────────────────────
-    @app.route("/")
-    def home():
-        return jsonify({"message": "M&M Fashion backend running"})
+    # ── Static file serving — single route handles all upload subfolders ────
+    # Covers: /uploads/payment_proofs/*, /uploads/products/*, /uploads/photos/*
+    @app.route('/uploads/<path:filename>')
+    def serve_uploads(filename):
+        return send_from_directory(UPLOADS_DIR, filename)
 
-    @app.route("/uploads/photos/<path:filename>")
-    def serve_photo(filename):
-        upload_dir = os.path.join(os.path.dirname(__file__), 'uploads', 'photos')
-        return send_from_directory(upload_dir, filename)
+    # ── Error Handlers ───────────────────────────────────────────────────────
+    @app.errorhandler(404)
+    def not_found(e):
+        return jsonify({"error": "Resource not found"}), 404
 
-    @app.route("/uploads/products/<path:filename>")
-    def serve_product_image(filename):
-        upload_dir = os.path.join(os.path.dirname(__file__), 'uploads', 'products')
-        return send_from_directory(upload_dir, filename)
-
-    @app.route("/api/test-db")
-    def test_db():
-        try:
-            db.session.execute(text("SELECT 1"))
-            return jsonify({"status": "connected", "message": "Database connection successful"})
-        except Exception as e:
-            return jsonify({"status": "error", "message": str(e)}), 500
+    @app.errorhandler(500)
+    def internal_error(e):
+        return jsonify({"error": "Internal server error"}), 500
 
     return app
 

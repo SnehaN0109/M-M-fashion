@@ -80,11 +80,16 @@ def add_to_cart():
 
     cart_item = CartItem.query.filter_by(cart_id=cart.id, variant_id=variant_id).first()
     if cart_item:
-        cart_item.quantity += quantity
-    else:
-        cart_item = CartItem(cart_id=cart.id, variant_id=variant_id, quantity=quantity)
-        db.session.add(cart_item)
+        # Item already in cart — do not add duplicate, return info response
+        return jsonify({
+            "message": "Item already in cart",
+            "duplicate": True,
+            "cart_item_id": cart_item.id,
+            "current_quantity": cart_item.quantity
+        }), 200
 
+    cart_item = CartItem(cart_id=cart.id, variant_id=variant_id, quantity=quantity)
+    db.session.add(cart_item)
     db.session.commit()
     return jsonify({"message": "Added to cart", "cart_item_id": cart_item.id})
 

@@ -3,19 +3,25 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { CartContext } from "../context/CartContext";
 import { useDomain } from "../context/DomainContext";
 import { Loader2, ShoppingBag, Truck } from "lucide-react";
-
 const CheckoutPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { cartItems, clearCart } = useContext(CartContext);
+  const { removeOrderedItems } = useContext(CartContext);
   const { domain, priceKey } = useDomain();
 
-  // Receive discount from CartPage via navigation state
+  // Receive selected items + discount from CartPage via navigation state
   const discountApplied = location.state?.discountApplied || null;
+  // selectedItems: only the items the user checked in CartPage
+  // Guard: ensure it's always an array with valid items
+  const selectedItems = (location.state?.selectedItems || []).filter(
+    item => item?.activeVariant?.id && item?.cartQuantity >= 1
+  );
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [fieldErrors, setFieldErrors] = useState({});
+  // UPI is the only payment method — hardcoded, no selector needed
+  const paymentMethod = "UPI";
 
   const [form, setForm] = useState({
     customer_name: "",
@@ -40,24 +46,24 @@ const CheckoutPage = () => {
     }
   }, []);
 
-  // Redirect if cart is empty
-  if (cartItems.length === 0) {
+  // Redirect if no items were selected (direct URL access)
+  if (selectedItems.length === 0) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-6">
         <ShoppingBag size={48} className="text-gray-300" />
-        <p className="text-xl font-bold text-gray-500">Your cart is empty</p>
+        <p className="text-xl font-bold text-gray-500">No items selected</p>
         <button
-          onClick={() => navigate("/products")}
+          onClick={() => navigate("/cart")}
           className="px-8 py-3 bg-pink-600 text-white font-bold rounded-2xl"
         >
-          Continue Shopping
+          Back to Cart
         </button>
       </div>
     );
   }
 
-  // Price calculations
-  const subtotal = cartItems.reduce(
+  // Price calculations — based on selectedItems only
+  const subtotal = selectedItems.reduce(
     (sum, item) => sum + (item.price || 0) * (item.cartQuantity || 1), 0
   );
   const discountAmount = discountApplied?.amount || 0;
@@ -138,16 +144,25 @@ const CheckoutPage = () => {
   };
 
   const handlePlaceOrder = async () => {
-    // Validate form
+    // Validate form fields first
     if (!validateForm()) {
       setError("Please fix the errors above before placing your order");
       return;
     }
 
-    // Validate all cart items have a selected variant
-    const missingVariant = cartItems.find(item => !item.activeVariant?.id);
-    if (missingVariant) {
-      setError(`Please select a size/color for "${missingVariant.name}" before checkout.`);
+    // ── Step 1: Strip malformed items silently ────────────────────────────
+    // Keep only items that have a valid variant id, quantity > 0, and a price
+    const validItems = selectedItems.filter(
+      item =>
+        item?.activeVariant?.id &&
+        item?.cartQuantity > 0 &&
+        item?.price != null &&
+        item.price > 0
+    );
+
+    // ── Step 2: Validate at least one item remains after stripping ────────
+    if (validItems.length === 0) {
+      setError("No valid items selected. Please go back to cart and select items.");
       return;
     }
 
@@ -155,21 +170,23 @@ const CheckoutPage = () => {
     setError("");
 
     try {
+      // ── Step 3: Build payload using ONLY validItems ───────────────────
       const payload = {
         ...form,
         domain: domain || window.location.hostname,
         price_key: priceKey || "price_b2c",
         discount_code: discountApplied?.code || "",
-        items: cartItems.map(item => ({
-          variant_id: item.activeVariant?.id,
-          quantity: item.cartQuantity || 1
-        }))
+        payment_method: paymentMethod,
+        items: validItems.map(item => ({
+          variant_id: item.activeVariant.id,
+          quantity: item.cartQuantity,
+        })),
       };
 
       const res = await fetch(`${import.meta.env.VITE_API_URL}/api/orders/checkout`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
+        body: JSON.stringify(payload),
       });
 
       const data = await res.json();
@@ -179,10 +196,21 @@ const CheckoutPage = () => {
         return;
       }
 
-      // Clear cart and navigate to success page with order_id
-      clearCart();
-      navigate("/order-success", { 
-        state: { order_id: data.order_id } 
+      // ── Step 4: Remove ONLY the ordered items — keep the rest ─────────
+      const orderedVariantIds = validItems
+        .map(i => i.activeVariant?.id)
+        .filter(Boolean);
+      await removeOrderedItems(orderedVariantIds);
+
+      // ── Step 5: Send WhatsApp order confirmation via backend ─────────
+      // Fire-and-forget — never block navigation if this fails
+      fetch(`${import.meta.env.VITE_API_URL}/api/orders/${data.order_id}/notify-whatsapp`, {
+        method: "POST",
+      }).catch(() => {}); // silent on network error
+
+      // ── Step 6: Navigate away (selectedItems resets naturally) ────────
+      navigate("/order-success", {
+        state: { order_id: data.order_id, paymentMethod, total },
       });
     } catch {
       setError("Network error. Please check your connection.");
@@ -359,7 +387,7 @@ const CheckoutPage = () => {
 
               {/* Items */}
               <div className="space-y-3 mb-6 max-h-60 overflow-y-auto">
-                {cartItems.map((item, i) => (
+                {selectedItems.map((item, i) => (
                   <div key={i} className="flex gap-3 items-center">
                     <img
                       src={item.image_url || "https://via.placeholder.com/60"}
@@ -401,10 +429,18 @@ const CheckoutPage = () => {
                 </div>
               </div>
 
-              {/* Payment method note */}
-              <div className="mt-4 bg-gray-50 rounded-xl p-3 text-xs text-gray-500 font-medium">
-                💵 Payment: Cash on Delivery
+              {/* Payment method — UPI only */}
+              <div className="mt-4 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 flex items-center gap-3">
+                <span className="text-xl">📱</span>
+                <div>
+                  <p className="text-xs font-black text-amber-800 uppercase tracking-wider">Payment Method</p>
+                  <p className="text-sm font-bold text-amber-700">UPI / QR Code</p>
+                </div>
+                <span className="ml-auto text-xs font-black text-amber-600 bg-amber-100 px-2 py-1 rounded-lg">Only option</span>
               </div>
+              <p className="mt-2 text-xs text-amber-700 font-medium bg-amber-50 rounded-lg px-3 py-2">
+                💡 UPI payment instructions will appear after placing the order.
+              </p>
 
               {/* Error */}
               {error && (
