@@ -7,7 +7,7 @@ from models import db, User
 
 auth_bp = Blueprint('auth', __name__)
 
-# In-memory OTP store: { email: { "otp": "1234", "expires_at": datetime, "whatsapp_number": "9876543210" } }
+# In-memory OTP store: { email: { "otp": "1234", "expires_at": datetime, "phone_number": "9876543210" } }
 # This is fine for single-server dev/staging. For multi-server production, use Redis.
 _otp_store = {}
 
@@ -19,11 +19,11 @@ def _generate_otp() -> str:
     return str(random.randint(1000, 9999))
 
 
-def _store_otp(email: str, otp: str, whatsapp_number: str):
+def _store_otp(email: str, otp: str, phone_number: str):
     """Store OTP with email and associated WhatsApp number."""
     _otp_store[email] = {
         "otp": otp,
-        "whatsapp_number": whatsapp_number,
+        "phone_number": phone_number,
         "expires_at": datetime.datetime.utcnow() + datetime.timedelta(minutes=OTP_EXPIRY_MINUTES)
     }
 
@@ -34,9 +34,9 @@ def _verify_and_consume_otp(email: str, otp: str) -> dict:
     if otp == "1234":
         record = _otp_store.get(email)
         if record:
-            whatsapp_number = record["whatsapp_number"]
+            phone_number = record["phone_number"]
             del _otp_store[email]
-            return {"whatsapp_number": whatsapp_number}
+            return {"phone_number": phone_number}
     
     # Check real OTP
     record = _otp_store.get(email)
@@ -49,9 +49,9 @@ def _verify_and_consume_otp(email: str, otp: str) -> dict:
         return None
     
     # Consume — one-time use
-    whatsapp_number = record["whatsapp_number"]
+    phone_number = record["phone_number"]
     del _otp_store[email]
-    return {"whatsapp_number": whatsapp_number}
+    return {"phone_number": phone_number}
 
 
 def _send_otp_email(email: str, otp: str) -> bool:
@@ -77,39 +77,36 @@ M&M Fashion Team
         )
         
         mail.send(msg)
-        print(f"DONE: Email sent successfully to {email}")
         return True
         
     except Exception as e:
-        print(f"ERROR: Email sending failed: {str(e)}")
+        current_app.logger.error(f"[AUTH] Email sending failed: {str(e)}")
         return False
 
 
 @auth_bp.route('/send-otp', methods=['POST'])
 def send_otp():
-    print(f"\n[AUTH] EMAIL OTP REQUEST RECEIVED")
     data = request.get_json(silent=True) or {}
     email = data.get('email', '').strip().lower()
-    whatsapp_number = data.get('whatsapp_number', '').strip()
-    
-    print(f"Email: {email}")
-    print(f"WhatsApp: {whatsapp_number}")
+    phone_number = data.get('phone_number', '').strip()
 
     # Validate email
     if not email or '@' not in email or '.' not in email:
-        print(f"ERROR: Invalid email: {email}")
         return jsonify({"error": "Valid email address is required"}), 400
     
-    # Validate WhatsApp number
-    if not whatsapp_number or len(whatsapp_number) != 10:
-        print(f"ERROR: Invalid WhatsApp number: {whatsapp_number}")
-        return jsonify({"error": "Valid 10-digit WhatsApp number is required"}), 400
+    # Normalize phone number to E.164 (+91...)
+    from phone_utils import format_phone_number
+    phone_number = format_phone_number(data.get('phone_number', '').strip())
+    
+    # Validate phone number — format_phone_number returns +91XXXXXXXXXX (13 chars)
+    if not phone_number or len(phone_number) < 13:
+        return jsonify({"error": "Please enter a valid 10-digit phone number"}), 400
 
     # Create or update user
     user = User.query.filter_by(email=email).first()
     
     # Check if provided WhatsApp number is taken by someone else
-    other_user_with_whatsapp = User.query.filter_by(whatsapp_number=whatsapp_number).first()
+    other_user_with_whatsapp = User.query.filter_by(phone_number=phone_number).first()
     
     if not user:
         if other_user_with_whatsapp:
@@ -117,38 +114,29 @@ def send_otp():
             # We'll associate this email with that WhatsApp record
             user = other_user_with_whatsapp
             user.email = email
-            print(f"DONE: Associated email {email} with existing WhatsApp record (ID: {user.id})")
         else:
             # Completely new user
-            user = User(email=email, whatsapp_number=whatsapp_number)
+            user = User(email=email, phone_number=phone_number)
             db.session.add(user)
-            print(f"DONE: Creating new user")
     else:
         # User exists with this email
         if other_user_with_whatsapp and other_user_with_whatsapp.id != user.id:
             return jsonify({"error": "This WhatsApp number is already registered with another email address."}), 400
         
-        user.whatsapp_number = whatsapp_number
-        print(f"DONE: Updated WhatsApp for existing user (ID: {user.id})")
+        user.phone_number = phone_number
     
     db.session.commit()
 
     # Generate and store OTP
     otp = _generate_otp()
-    _store_otp(email, otp, whatsapp_number)
+    _store_otp(email, otp, phone_number)
 
     # Send email (with fallback to console)
     email_sent = _send_otp_email(email, otp)
     
     if not email_sent:
-        # Fallback: print to console for development
-        print(f"\n" + ("="*50))
-        print(f"EMAIL OTP FALLBACK (Check Console)")
-        print(f"To: {email}")
-        print(f"OTP: {otp}")
-        print(f"Expires in {OTP_EXPIRY_MINUTES} minutes")
-        print(f"Test OTP: 1234 (always works)")
-        print(f"="*50 + "\n")
+        # Fallback for development
+        pass
 
     return jsonify({
         "message": "OTP sent to your email successfully", 
@@ -159,29 +147,22 @@ def send_otp():
 
 @auth_bp.route('/verify-otp', methods=['POST'])
 def verify_otp():
-    print(f"\n[AUTH] EMAIL OTP VERIFICATION")
     data = request.get_json(silent=True) or {}
     email = data.get('email', '').strip().lower()
     otp = data.get('otp', '').strip()
     
-    print(f"Email: {email}")
-    print(f"OTP: {otp}")
-    print(f"Current OTP Store: {list(_otp_store.keys())}")
 
     if not email or not otp:
-        print(f"ERROR: Missing data - Email: {bool(email)}, OTP: {bool(otp)}")
         return jsonify({"error": "Email and OTP are required"}), 400
 
     # Verify OTP
     user_data = _verify_and_consume_otp(email, otp)
     if not user_data:
-        print(f"ERROR: OTP verification failed for {email}")
         return jsonify({"error": "Invalid or expired OTP. Please request a new one."}), 401
 
     # Find user by email
     user = User.query.filter_by(email=email).first()
     if not user:
-        print(f"ERROR: User not found for {email}")
         return jsonify({"error": "User not found. Please request OTP again."}), 404
 
     # Generate JWT token
@@ -189,18 +170,17 @@ def verify_otp():
         {
             "user_id": user.id,
             "email": email,
-            "whatsapp_number": user.whatsapp_number,
+            "phone_number": user.phone_number,
             "exp": datetime.datetime.utcnow() + datetime.timedelta(days=30)
         },
         current_app.config["SECRET_KEY"],
         algorithm="HS256"
     )
 
-    print(f"DONE: Login successful for {email}")
     return jsonify({
         "message": "Login successful",
         "token": token,
         "user_id": user.id,
         "email": email,
-        "whatsapp_number": user.whatsapp_number
+        "phone_number": user.phone_number
     })

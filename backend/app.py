@@ -34,6 +34,7 @@ def create_app():
     from routes.cart_orders import cart_orders_bp
     from routes.payment import payment_bp
     from routes.wishlist import wishlist_bp
+    from routes.test_sms import test_sms_bp
 
     app.register_blueprint(products_bp, url_prefix='/api/products')
     app.register_blueprint(admin_bp, url_prefix='/api/admin')
@@ -42,6 +43,7 @@ def create_app():
     app.register_blueprint(cart_orders_bp, url_prefix='/api')
     app.register_blueprint(payment_bp)
     app.register_blueprint(wishlist_bp, url_prefix='/api')
+    app.register_blueprint(test_sms_bp, url_prefix='/api/test')
 
     # ── Static file serving — single route handles all upload subfolders ────
     # Covers: /uploads/payment_proofs/*, /uploads/products/*, /uploads/photos/*

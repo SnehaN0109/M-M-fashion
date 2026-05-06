@@ -1,63 +1,37 @@
-# Node.js / React
+# Environment files - NEVER push these
+.env
+backend/.env
+*.env
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+venv/
+env/
+*.egg-info/
+
+# Node
 node_modules/
 dist/
-dist-ssr/
-*.local
-.env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
+build/
 
-# Python / Flask
-venv/
-.venv/
-env/
-python_env/
-__pycache__/
-*.py[cod]
-*$py.class
-.env
-.flaskenv
+# Uploads
+backend/uploads/
+uploads/
+
+# Database
 *.db
-*.sqlite3
+*.sqlite
 
-# Backend env files (contain real credentials — never commit)
-backend/.env
-backend/.env.production
-
-# Uploaded files (user content — not source code)
-backend/uploads/payment_proofs/*
-backend/uploads/photos/*
-backend/uploads/products/*
-!backend/uploads/payment_proofs/.gitkeep
-!backend/uploads/photos/.gitkeep
-!backend/uploads/products/.gitkeep
-
-# Test / migration / debug scripts (not needed in production)
-backend/test_*.py
-backend/regression_test.py
-backend/final_test.py
-backend/migrate_*.py
-backend/check_*.py
-backend/verify_*.py
-backend/show_*.py
-backend/add_test_*.py
-
-# Logs
-logs/
-*.log
-
-# IDEs
-.vscode/
-.idea/
-*.swp
-*.swo
-
-# OS
+# OS files
 .DS_Store
 Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Test files
+scratch/
+tests/last_run_report.txt

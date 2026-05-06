@@ -111,7 +111,7 @@ const ContactUsPage = () => {
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-pink-600 hover:bg-pink-700 text-white font-black py-4 rounded-2xl flex items-center justify-center gap-2 disabled:opacity-50 transition-all"
+              className="w-full bg-pink-600 hover:bg-pink-700 text-white font-black py-4 rounded-2xl flex items-center justify-center gap-2 disabled:opacity-50 transition-all active:scale-95"
             >
               {loading ? <Loader2 size={18} className="animate-spin" /> : <MessageCircle size={18} />}
               {loading ? "Sending..." : "Send Message"}

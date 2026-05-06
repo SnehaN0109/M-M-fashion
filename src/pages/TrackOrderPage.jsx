@@ -29,7 +29,13 @@ const TrackOrderPage = () => {
 
   useEffect(() => {
     if (!orderId) return;
-    fetch(`${import.meta.env.VITE_API_URL}/api/orders/track/${orderId}`)
+    fetch(`${import.meta.env.VITE_API_URL}/api/orders/track/${orderId}`, {
+      headers: {
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0'
+      }
+    })
       .then((r) => {
         if (!r.ok) throw new Error("Order not found.");
         return r.json();

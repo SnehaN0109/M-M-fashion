@@ -438,11 +438,20 @@ const OrdersTab = () => {
       body: JSON.stringify({ status, payment_status: paymentStatus, tracking_number: tracking || undefined })
     });
     if (res.ok) {
-      setOrders(prev => prev.map(o =>
-        o.id === orderId
-          ? { ...o, status, payment_status: paymentStatus, tracking_number: tracking || o.tracking_number }
-          : o
-      ));
+      const data = await res.json();
+      if (data.success && data.order) {
+        setOrders(prev => prev.map(o => o.id === orderId ? { ...o, ...data.order } : o));
+      } else {
+        // fallback
+        setOrders(prev => prev.map(o =>
+          o.id === orderId
+            ? { ...o, status, payment_status: paymentStatus, tracking_number: tracking || o.tracking_number }
+            : o
+        ));
+      }
+      import("react-hot-toast").then(m => m.default.success("Order updated successfully"));
+    } else {
+      import("react-hot-toast").then(m => m.default.error("Failed to update order"));
     }
     setUpdating(null);
   };

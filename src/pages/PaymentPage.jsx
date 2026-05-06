@@ -14,7 +14,7 @@ const PaymentPage = () => {
         </p>
         <Link
           to="/checkout"
-          className="block w-full bg-pink-600 text-white font-black py-4 rounded-2xl hover:bg-pink-700 transition"
+          className="block w-full bg-pink-600 text-white font-black py-4 rounded-2xl hover:bg-pink-700 active:scale-95 transition-all"
         >
           Back to Checkout
         </Link>

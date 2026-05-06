@@ -1,4 +1,4 @@
-import { createContext, useState, useCallback } from "react";
+import { createContext, useState, useCallback, useEffect } from "react";
 
 export const WishlistContext = createContext();
 
@@ -26,6 +26,13 @@ export const WishlistProvider = ({ children }) => {
       // network error — keep current state
     }
   }, []);
+
+  // ── Auto-load on mount if user is already logged in (handles page refresh) ─
+  useEffect(() => {
+    if (whatsapp()) {
+      loadWishlistForUser();
+    }
+  }, [loadWishlistForUser]);
 
   // ── Add to wishlist ───────────────────────────────────────────────────────
   const addToWishlist = async (product) => {

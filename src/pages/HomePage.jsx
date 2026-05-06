@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useDomain } from "../context/DomainContext";
 import ProductCard from "../components/ProductCard";
-import { ChevronDown, Sparkles, Loader2, PackageX } from "lucide-react";
+import { Loader2, PackageX } from "lucide-react";
 
 const HomePage = () => {
   const { showSliders, showWelcomeOffer, domain, priceKey } = useDomain();
@@ -47,77 +47,106 @@ const HomePage = () => {
 
   return (
     <div className="min-h-screen bg-white">
-      
-      {/* Dynamic Promo Banner */}
+
+      {/* Promo Banner */}
       {showWelcomeOffer && popupMsg && (
-        <div className="bg-pink-600 text-white overflow-hidden relative">
-          <div className="max-w-7xl mx-auto py-3 px-6 text-center text-xs font-black uppercase tracking-[0.3em] flex items-center justify-center gap-4">
-             <Sparkles size={16} />
-             <span>{popupMsg}</span>
-             <Sparkles size={16} />
-          </div>
+        <div className="bg-black text-white py-2.5 px-6 text-center text-xs font-medium tracking-widest">
+          {popupMsg}
         </div>
       )}
 
-      {/* Hero Slider Placeholder */}
+      {/* Hero */}
       {showSliders && (
-        <div className="relative w-full h-[70vh] bg-gray-900 overflow-hidden">
-           <img 
-              src="/src/assets/images/web_banner.jpg" 
-              className="w-full h-full object-cover opacity-60"
-              alt="Hero"
-           />
-           <div className="absolute inset-0 flex flex-col items-center justify-center text-center text-white px-6">
-              <span className="text-sm font-black uppercase tracking-[0.5em] mb-6 animate-pulse">New Arrival</span>
-              <h1 className="text-7xl md:text-9xl font-black tracking-tighter mb-8 leading-none">
-                SPRING <br/> <span className="text-pink-600">COLLECTION</span>
-              </h1>
-              <p className="max-w-lg text-lg font-medium text-gray-200 mb-10 leading-relaxed">
-                Discover the latest seasonal trends crafted with care and designed for the modern individual.
-              </p>
-              <button 
-                onClick={() => navigate('/products')}
-                className="px-12 py-5 bg-white text-gray-900 font-black rounded-full shadow-2xl hover:bg-pink-600 hover:text-white transition-all transform hover:scale-105 active:scale-95"
-              >
-                SHOP THE LOOK
-              </button>
-           </div>
-        </div>
+        <section className="relative w-full h-[85vh] bg-gray-50 overflow-hidden">
+          <img
+            src="/src/assets/images/web_banner.jpg"
+            className="w-full h-full object-cover"
+            alt="Hero"
+          />
+          {/* Subtle dark overlay */}
+          <div className="absolute inset-0 bg-black/30" />
+          <div className="absolute inset-0 flex flex-col items-center justify-center text-center px-6">
+            <p className="text-white/70 text-xs font-semibold uppercase tracking-[0.4em] mb-5">New Season</p>
+            <h1 className="text-5xl sm:text-7xl md:text-8xl font-black text-white tracking-tight leading-none mb-6">
+              Spring<br />Collection
+            </h1>
+            <p className="text-white/80 text-base max-w-md mb-10 leading-relaxed font-light">
+              Discover the latest seasonal trends crafted with care and designed for the modern individual.
+            </p>
+            <button
+              onClick={() => navigate('/products')}
+              className="px-10 py-4 bg-white text-black text-sm font-semibold rounded-full hover:bg-gray-100 transition-all active:scale-95 shadow-xl"
+            >
+              Shop Now
+            </button>
+          </div>
+        </section>
       )}
 
-      {/* Featured Section */}
-      <section className="max-w-7xl mx-auto px-6 py-24">
-        <div className="flex flex-col items-center text-center mb-16 space-y-4">
-           <span className="text-xs font-black text-pink-600 uppercase tracking-widest">Handpicked for you</span>
-           <h2 className="text-5xl font-black text-gray-900 tracking-tighter italic">Suggested Styles</h2>
-           <div className="w-12 h-1 bg-pink-600 rounded-full" />
+      {/* Category Strip */}
+      <section className="border-b border-gray-100">
+        <div className="max-w-7xl mx-auto px-6 py-5 flex items-center justify-center gap-2 overflow-x-auto">
+          {[
+            { label: "All", path: "/products" },
+            { label: "Women", path: "/women" },
+            { label: "Men", path: "/men" },
+            { label: "Kids", path: "/kids" },
+            { label: "Ethnic", path: "/ethnic" },
+            { label: "Western", path: "/western" },
+            { label: "Party Wear", path: "/party-wear" },
+          ].map(cat => (
+            <button
+              key={cat.label}
+              onClick={() => navigate(cat.path)}
+              className="flex-shrink-0 px-5 py-2 rounded-full border border-gray-200 text-xs font-semibold text-gray-600 hover:border-black hover:text-black hover:bg-gray-50 transition-all duration-150"
+            >
+              {cat.label}
+            </button>
+          ))}
+        </div>
+      </section>
+
+      {/* Products Section */}
+      <section className="max-w-7xl mx-auto px-6 py-16">
+        <div className="flex items-end justify-between mb-10">
+          <div>
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-1">Handpicked for you</p>
+            <h2 className="text-3xl font-black text-black tracking-tight">Featured Styles</h2>
+          </div>
+          <button
+            onClick={() => navigate('/products')}
+            className="text-sm font-semibold text-gray-500 hover:text-black transition-colors underline underline-offset-4"
+          >
+            View all
+          </button>
         </div>
 
         {loading ? (
-             <div className="flex flex-col items-center justify-center py-20 space-y-4">
-               <Loader2 className="w-12 h-12 text-pink-600 animate-spin" />
-               <p className="text-xs font-black text-gray-400 uppercase tracking-widest">Loading Boutique...</p>
-             </div>
+          <div className="flex flex-col items-center justify-center py-24 gap-4">
+            <Loader2 className="w-8 h-8 text-gray-400 animate-spin" />
+            <p className="text-xs text-gray-400 uppercase tracking-widest">Loading...</p>
+          </div>
         ) : error ? (
-            <div className="text-center py-20 space-y-4 grayscale scale-90 opacity-50">
-               <PackageX size={48} className="mx-auto text-gray-400" />
-               <p className="text-sm font-black text-gray-400 uppercase tracking-widest">Unable to sync with boutique.</p>
-            </div>
+          <div className="text-center py-20">
+            <PackageX size={40} className="mx-auto text-gray-300 mb-4" />
+            <p className="text-sm text-gray-400">Unable to load products.</p>
+          </div>
         ) : (
           <>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6">
               {products.slice(0, visibleCount).map((product) => (
                 <ProductCard key={product.id} product={product} />
               ))}
             </div>
 
-            {/* LOAD MORE */}
             {visibleCount < products.length && (
-              <div className="flex flex-col items-center mt-20 group cursor-pointer" onClick={() => setVisibleCount(v => v + 8)}>
-                <div className="flex items-center gap-4 px-10 py-4 border-2 border-gray-900 rounded-full font-black text-sm uppercase tracking-widest hover:bg-gray-900 hover:text-white transition-all shadow-lg active:scale-95">
-                   Discover More Pieces
-                   <ChevronDown size={20} className="group-hover:translate-y-1 transition-transform" />
-                </div>
+              <div className="flex justify-center mt-14">
+                <button
+                  onClick={() => setVisibleCount(v => v + 8)}
+                  className="px-10 py-3.5 border border-black text-black text-sm font-semibold rounded-full hover:bg-black hover:text-white transition-all duration-200 active:scale-95"
+                >
+                  Load More
+                </button>
               </div>
             )}
           </>
@@ -125,15 +154,20 @@ const HomePage = () => {
       </section>
 
       {/* Trust Badges */}
-      <section className="bg-gray-50 border-y border-gray-100 py-16">
-         <div className="max-w-7xl mx-auto px-6 grid grid-cols-2 md:grid-cols-4 gap-12 text-center">
-            {['Global Shipping', 'Secure Checkout', 'Premium Quality', '24/7 Support'].map(badge => (
-              <div key={badge} className="space-y-2">
-                 <p className="text-xs font-black text-gray-900 uppercase tracking-widest">{badge}</p>
-                 <p className="text-[10px] text-gray-400 font-bold uppercase">Trusted Worldwide</p>
-              </div>
-            ))}
-         </div>
+      <section className="border-t border-gray-100 py-12">
+        <div className="max-w-7xl mx-auto px-6 grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
+          {[
+            { title: "Free Shipping", sub: "On orders above ₹999" },
+            { title: "Secure Checkout", sub: "100% safe & encrypted" },
+            { title: "Premium Quality", sub: "Curated collections" },
+            { title: "Easy Returns", sub: "7-day return policy" },
+          ].map(b => (
+            <div key={b.title} className="space-y-1">
+              <p className="text-sm font-semibold text-black">{b.title}</p>
+              <p className="text-xs text-gray-400">{b.sub}</p>
+            </div>
+          ))}
+        </div>
       </section>
 
     </div>

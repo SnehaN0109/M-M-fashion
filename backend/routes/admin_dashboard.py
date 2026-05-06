@@ -7,6 +7,15 @@ import jwt as pyjwt
 import datetime
 from models import db, Product, ProductVariant, ProductImage, UserPhoto, DiscountCode, Order, SiteSetting, User
 from utils import assign_tracking_number
+from sqlalchemy.orm import joinedload
+
+# ─── Safe SMS Import ───────────────────────────────────────────────────────────
+try:
+    from sms_service import send_sms, send_order_confirmation_sms, send_payment_rejection_sms, send_payment_received_sms
+    SMS_ENABLED = True
+except ImportError:
+    SMS_ENABLED = False
+    current_app.logger.warning("sms_service.py not found. SMS notifications disabled.")
 
 # ─── Upload helpers ────────────────────────────────────────────────────────────
 PRODUCT_UPLOAD_FOLDER = os.path.join(os.path.dirname(__file__), '..', 'uploads', 'products')
@@ -55,7 +64,7 @@ def admin_login():
 @admin_bp.route('/products', methods=['GET'])
 @admin_required
 def list_products():
-    products = Product.query.order_by(Product.created_at.desc()).all()
+    products = Product.query.options(joinedload(Product.variants)).order_by(Product.created_at.desc()).all()
     result = []
     for p in products:
         result.append({
@@ -191,7 +200,8 @@ def delete_product(product_id):
 def list_orders():
     status_filter = request.args.get('status')
     domain_filter = request.args.get('domain')   # e.g. ?domain=ttd.in
-    query = Order.query.order_by(Order.created_at.desc())
+    # Optimize with joinedload for items to prevent N+1 queries
+    query = Order.query.options(joinedload(Order.items)).order_by(Order.created_at.desc())
     if status_filter:
         query = query.filter_by(status=status_filter)
     if domain_filter:
@@ -230,7 +240,7 @@ def list_orders():
 def update_order_status(order_id):
     o = Order.query.get_or_404(order_id)
     data = request.json
-    valid_statuses = ['PENDING_PAYMENT', 'PLACED', 'PACKED', 'SHIPPED', 'OUT_FOR_DELIVERY', 'DELIVERED', 'CANCELLED']
+    valid_statuses = ['PENDING', 'PENDING_PAYMENT', 'PLACED', 'PACKED', 'SHIPPED', 'OUT_FOR_DELIVERY', 'DELIVERED', 'CANCELLED', 'REJECTED', 'PAID', 'CONFIRMED', 'VERIFIED']
     valid_payment_statuses = ['PENDING', 'VERIFIED', 'FAILED']
     
     new_status = data.get('status')
@@ -256,11 +266,59 @@ def update_order_status(order_id):
         assign_tracking_number(o, db.session)
 
     db.session.commit()
+
+    # ── Trigger SMS Notification based on new status ──────────────────────────
+    if SMS_ENABLED:
+        try:
+            phone = o.customer_phone
+            name = o.customer_name
+            
+            if phone:
+                message = None
+                if new_status == 'PLACED':
+                    message = (
+                        f"Dear {name}, Great news! Your M&M Fashion order #{o.id} "
+                        f"has been CONFIRMED. Amount: Rs.{o.total_amount}. "
+                        f"Tracking: {o.tracking_number or 'Will be updated soon'}. "
+                        f"Thank you for shopping with us!"
+                    )
+                elif new_status in ['CANCELLED', 'REJECTED']:
+                    message = (
+                        f"Dear {name}, your M&M Fashion order #{o.id} "
+                        f"has been CANCELLED. Amount: Rs.{o.total_amount}. "
+                        f"If you paid, refund will be processed in 3-5 business days. "
+                        f"Contact us for support."
+                    )
+                elif new_status == 'SHIPPED':
+                    message = (
+                        f"Dear {name}, your M&M Fashion order #{o.id} "
+                        f"has been SHIPPED! "
+                        f"Tracking number: {o.tracking_number}. "
+                        f"Expected delivery in 3-5 business days."
+                    )
+                elif new_status == 'DELIVERED':
+                    message = (
+                        f"Dear {name}, your M&M Fashion order #{o.id} "
+                        f"has been DELIVERED! "
+                        f"Thank you for shopping with M&M Fashion. "
+                        f"Please share your feedback!"
+                    )
+                
+                if message:
+                    send_sms(phone, message)
+                    print(f"Status update SMS ({new_status}) sent to {phone}")
+                    
+        except Exception as e:
+            current_app.logger.error(f"[SMS] Auto-trigger failed for Order #{o.id}: {e}")
+
     return jsonify({
-        "message": "Order status updated",
-        "status": o.status,
-        "payment_status": o.payment_status,
-        "tracking_number": o.tracking_number,
+        "success": True,
+        "order": {
+            "id": o.id,
+            "status": o.status,
+            "payment_status": o.payment_status,
+            "tracking_number": o.tracking_number,
+        }
     })
 
 
@@ -385,7 +443,7 @@ def list_users():
     users = User.query.order_by(User.created_at.desc()).all()
     return jsonify([{
         "id": u.id,
-        "whatsapp_number": u.whatsapp_number,
+        "phone_number": u.phone_number,
         "name": u.name,
         "email": u.email,
         "role": u.role or 'B2C',

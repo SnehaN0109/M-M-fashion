@@ -202,13 +202,9 @@ const CheckoutPage = () => {
         .filter(Boolean);
       await removeOrderedItems(orderedVariantIds);
 
-      // ── Step 5: Send WhatsApp order confirmation via backend ─────────
-      // Fire-and-forget — never block navigation if this fails
-      fetch(`${import.meta.env.VITE_API_URL}/api/orders/${data.order_id}/notify-whatsapp`, {
-        method: "POST",
-      }).catch(() => {}); // silent on network error
-
-      // ── Step 6: Navigate away (selectedItems resets naturally) ────────
+      // ── Step 5: Navigate away (selectedItems resets naturally) ────────
+      // Note: WhatsApp confirmation is sent automatically by the backend
+      // inside the checkout API — no need to call it again from frontend.
       navigate("/order-success", {
         state: { order_id: data.order_id, paymentMethod, total },
       });
@@ -276,15 +272,15 @@ const CheckoutPage = () => {
                 </div>
                 <div>
                   <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">
-                    WhatsApp Number {form.whatsapp_number && <span className="text-green-600">✓</span>}
+                    Notification Number {form.phone_number && <span className="text-blue-600">✓</span>}
                   </label>
-                  <input name="whatsapp_number" value={form.whatsapp_number} onChange={handleChange}
+                  <input name="phone_number" value={form.phone_number} onChange={handleChange}
                     maxLength="10"
                     className="mt-1 w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-pink-500 bg-gray-50"
                     placeholder="Auto-filled from login" 
-                    readOnly={!!form.whatsapp_number} />
-                  {form.whatsapp_number && (
-                    <p className="mt-1 text-xs text-green-600 font-bold">✓ Auto-filled from your login</p>
+                    readOnly={!!form.phone_number} />
+                  {form.phone_number && (
+                    <p className="mt-1 text-xs text-blue-600 font-bold">✓ Auto-filled from your login</p>
                   )}
                 </div>
               </div>

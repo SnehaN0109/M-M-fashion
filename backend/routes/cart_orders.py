@@ -4,11 +4,11 @@ from models import db, Order, OrderItem, Cart, CartItem, ProductVariant, Discoun
 cart_orders_bp = Blueprint('cart_orders', __name__)
 
 
-def _get_or_create_cart(whatsapp_number):
+def _get_or_create_cart(phone_number):
     """Helper: get or create cart for a user by whatsapp number."""
-    user = User.query.filter_by(whatsapp_number=whatsapp_number).first()
+    user = User.query.filter_by(phone_number=phone_number).first()
     if not user:
-        user = User(whatsapp_number=whatsapp_number)
+        user = User(phone_number=phone_number)
         db.session.add(user)
         db.session.flush()
     cart = Cart.query.filter_by(user_id=user.id).first()
@@ -22,11 +22,11 @@ def _get_or_create_cart(whatsapp_number):
 @cart_orders_bp.route('/cart', methods=['GET'])
 def get_cart():
     """Return all cart items for a user with full product/variant details."""
-    whatsapp_number = request.args.get('whatsapp_number', '').strip()
-    if not whatsapp_number:
-        return jsonify({"error": "whatsapp_number is required"}), 400
+    phone_number = request.args.get('phone_number', '').strip()
+    if not phone_number:
+        return jsonify({"error": "phone_number is required"}), 400
 
-    user = User.query.filter_by(whatsapp_number=whatsapp_number).first()
+    user = User.query.filter_by(phone_number=phone_number).first()
     if not user:
         return jsonify([])
 
@@ -61,12 +61,12 @@ def get_cart():
 @cart_orders_bp.route('/cart/add', methods=['POST'])
 def add_to_cart():
     data = request.get_json(silent=True) or {}
-    whatsapp_number = data.get('whatsapp_number', '').strip()
+    phone_number = data.get('phone_number', '').strip()
     variant_id = data.get('variant_id')
     quantity = int(data.get('quantity', 1))
 
-    if not whatsapp_number:
-        return jsonify({"error": "whatsapp_number is required"}), 401
+    if not phone_number:
+        return jsonify({"error": "phone_number is required"}), 401
     if not variant_id:
         return jsonify({"error": "variant_id is required"}), 400
 
@@ -76,7 +76,7 @@ def add_to_cart():
     if variant.quantity < quantity:
         return jsonify({"error": "Insufficient stock"}), 400
 
-    user, cart = _get_or_create_cart(whatsapp_number)
+    user, cart = _get_or_create_cart(phone_number)
 
     cart_item = CartItem.query.filter_by(cart_id=cart.id, variant_id=variant_id).first()
     if cart_item:
@@ -97,13 +97,13 @@ def add_to_cart():
 @cart_orders_bp.route('/cart/remove', methods=['DELETE'])
 def remove_from_cart():
     data = request.get_json(silent=True) or {}
-    whatsapp_number = data.get('whatsapp_number', '').strip()
+    phone_number = data.get('phone_number', '').strip()
     variant_id = data.get('variant_id')
 
-    if not whatsapp_number or not variant_id:
-        return jsonify({"error": "whatsapp_number and variant_id are required"}), 400
+    if not phone_number or not variant_id:
+        return jsonify({"error": "phone_number and variant_id are required"}), 400
 
-    user = User.query.filter_by(whatsapp_number=whatsapp_number).first()
+    user = User.query.filter_by(phone_number=phone_number).first()
     if not user:
         return jsonify({"error": "User not found"}), 404
 
@@ -123,20 +123,20 @@ def remove_from_cart():
 def update_cart_quantity():
     """Update the quantity of a cart item — syncs frontend changes to database."""
     data = request.get_json(silent=True) or {}
-    whatsapp_number = data.get('whatsapp_number', '').strip()
+    phone_number = data.get('phone_number', '').strip()
     variant_id = data.get('variant_id')
     new_quantity = data.get('quantity')
 
     # Validation
-    if not whatsapp_number:
-        return jsonify({"error": "whatsapp_number is required"}), 401
+    if not phone_number:
+        return jsonify({"error": "phone_number is required"}), 401
     if not variant_id:
         return jsonify({"error": "variant_id is required"}), 400
     if new_quantity is None or new_quantity < 1:
         return jsonify({"error": "quantity must be at least 1"}), 400
 
     # Get user and cart
-    user = User.query.filter_by(whatsapp_number=whatsapp_number).first()
+    user = User.query.filter_by(phone_number=phone_number).first()
     if not user:
         return jsonify({"error": "User not found"}), 404
 
@@ -176,12 +176,12 @@ def update_cart_quantity():
 def clear_cart():
     """Delete all cart items for a user — called after order is placed."""
     data = request.get_json(silent=True) or {}
-    whatsapp_number = data.get('whatsapp_number', '').strip()
+    phone_number = data.get('phone_number', '').strip()
 
-    if not whatsapp_number:
-        return jsonify({"error": "whatsapp_number is required"}), 400
+    if not phone_number:
+        return jsonify({"error": "phone_number is required"}), 400
 
-    user = User.query.filter_by(whatsapp_number=whatsapp_number).first()
+    user = User.query.filter_by(phone_number=phone_number).first()
     if not user:
         return jsonify({"message": "No cart to clear"})
 

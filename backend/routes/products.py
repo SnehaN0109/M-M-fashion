@@ -25,7 +25,6 @@ def save_product_image(file):
 
 @products_bp.route('/', methods=['GET'], strict_slashes=False)
 def get_products():
-    print("DEBUG: get_products called!")
     domain = request.args.get('domain', 'garba.shop')
     category = request.args.get('category')
     size = request.args.get('size')
@@ -44,7 +43,7 @@ def get_products():
     if category:
         query = query.filter(Product.category.ilike(category))
 
-    products = query.all()
+    products = query.limit(50).all()
     result = []
 
     for p in products:
@@ -161,7 +160,7 @@ def add_review(product_id):
     whatsapp = data.get('whatsapp_number')
     user_id = None
     if whatsapp:
-        user = User.query.filter_by(whatsapp_number=whatsapp).first()
+        user = User.query.filter_by(phone_number=whatsapp).first()
         if user:
             user_id = user.id
 
@@ -197,7 +196,7 @@ def upload_photo(product_id):
     if not whatsapp:
         return jsonify({"error": "whatsapp_number is required"}), 400
 
-    user = User.query.filter_by(whatsapp_number=whatsapp).first()
+    user = User.query.filter_by(phone_number=whatsapp).first()
     if not user:
         return jsonify({"error": "User not found. Please login first."}), 404
 

@@ -1,4 +1,4 @@
-import { useState, useContext, useEffect, useRef } from "react";
+import { useState, useContext, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { CartContext } from "../context/CartContext";
 import { WishlistContext } from "../context/WishlistContext";
@@ -10,17 +10,8 @@ const CartPage = () => {
   const { addToWishlist } = useContext(WishlistContext);
 
   // ── Selection state — keyed by activeVariant.id ───────────────────────────
-  // Starts empty; synced to all items once cart loads (see useEffect below)
+  // Starts empty — user must manually select items to checkout
   const [selectedVariantIds, setSelectedVariantIds] = useState(new Set());
-  const initializedRef = useRef(false); // track whether we've done the first-load select-all
-
-  // Auto-select all items when cart first loads from DB
-  useEffect(() => {
-    if (!cartLoading && cartItems.length > 0 && !initializedRef.current) {
-      initializedRef.current = true;
-      setSelectedVariantIds(new Set(cartItems.map(i => i.activeVariant?.id).filter(Boolean)));
-    }
-  }, [cartItems, cartLoading]);
   const [selectionError, setSelectionError] = useState("");
   const [stockToast, setStockToast] = useState(""); // stock limit message
 

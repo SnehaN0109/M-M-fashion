@@ -24,7 +24,13 @@ const MyOrdersPage = () => {
     if (!whatsapp) { setLoading(false); return; }
     
     // Fetch orders with full details
-    fetch(`${import.meta.env.VITE_API_URL}/api/orders/my-orders?whatsapp_number=${encodeURIComponent(whatsapp)}`)
+    fetch(`${import.meta.env.VITE_API_URL}/api/orders/my-orders?whatsapp_number=${encodeURIComponent(whatsapp)}`, {
+      headers: {
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0'
+      }
+    })
       .then((r) => r.json())
       .then(async (data) => {
         if (Array.isArray(data)) {
@@ -32,7 +38,13 @@ const MyOrdersPage = () => {
           const ordersWithDetails = await Promise.all(
             data.map(async (order) => {
               try {
-                const detailRes = await fetch(`${import.meta.env.VITE_API_URL}/api/orders/track/${order.order_id}`);
+                const detailRes = await fetch(`${import.meta.env.VITE_API_URL}/api/orders/track/${order.order_id}`, {
+                  headers: {
+                    'Cache-Control': 'no-cache, no-store, must-revalidate',
+                    'Pragma': 'no-cache',
+                    'Expires': '0'
+                  }
+                });
                 const detailData = await detailRes.json();
                 return detailData;
               } catch {
@@ -47,7 +59,7 @@ const MyOrdersPage = () => {
       })
       .catch(() => setError("Could not connect to server."))
       .finally(() => setLoading(false));
-  }, [whatsapp]);
+  }, [phoneNumber]);
 
   if (loading) return (
     <div className="min-h-screen flex items-center justify-center">
@@ -55,12 +67,12 @@ const MyOrdersPage = () => {
     </div>
   );
 
-  if (!whatsapp) return (
+  if (!phoneNumber) return (
     <div className="min-h-screen flex flex-col items-center justify-center gap-6 px-6">
       <Package size={56} className="text-gray-200" />
-      <p className="text-xl font-black text-gray-500 text-center">Login with WhatsApp to view your orders</p>
-      <Link to="/whatsapp-login" className="px-8 py-3 bg-green-500 text-white font-bold rounded-2xl">
-        Login with WhatsApp
+      <p className="text-xl font-black text-gray-500 text-center">Login with Phone to view your orders</p>
+      <Link to="/login" className="px-8 py-3 bg-blue-600 text-white font-bold rounded-2xl">
+        Login with Phone
       </Link>
     </div>
   );

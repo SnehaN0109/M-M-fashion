@@ -10,7 +10,7 @@ wishlist_bp = Blueprint('wishlist', __name__)
 
 def _get_user(whatsapp_number: str):
     """Return user by whatsapp_number or None."""
-    return User.query.filter_by(whatsapp_number=whatsapp_number.strip()).first()
+    return User.query.filter_by(phone_number=whatsapp_number.strip()).first()
 
 
 # ── GET /api/wishlist?whatsapp_number=XXXXXXXXXX ──────────────────────────────

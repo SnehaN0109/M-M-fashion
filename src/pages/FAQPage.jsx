@@ -16,7 +16,7 @@ const faqs = [
       },
       {
         q: "How will I know my order is confirmed?",
-        a: "You will receive an order confirmation via WhatsApp and email once your payment is successful.",
+        a: "You will receive an order confirmation via SMS and email once your payment is successful.",
       },
     ],
   },
@@ -33,7 +33,7 @@ const faqs = [
       },
       {
         q: "How can I track my order?",
-        a: "Once shipped, you will receive a tracking link via WhatsApp. You can also track from the My Orders section.",
+        a: "Once shipped, you will receive a tracking link via SMS. You can also track from the My Orders section.",
       },
     ],
   },

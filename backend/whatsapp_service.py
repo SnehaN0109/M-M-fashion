@@ -1,124 +1,139 @@
-"""
-WhatsApp integration for M&M Fashion — powered by Twilio.
-
-Credentials required in backend/.env:
-  TWILIO_ACCOUNT_SID      — from https://console.twilio.com
-  TWILIO_AUTH_TOKEN       — from https://console.twilio.com
-  TWILIO_WHATSAPP_FROM    — e.g. whatsapp:+14155238886 (Twilio sandbox number)
-"""
 import os
-from datetime import datetime
+import requests
+import logging
+from pathlib import Path
+from dotenv import load_dotenv
 
+# Initialize logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-# ── Phone normalisation ───────────────────────────────────────────────────────
+# Load environment variables
+load_dotenv(dotenv_path=Path(__file__).parent / ".env", override=True)
 
-def _format_phone(raw: str) -> str:
+def send_whatsapp_message(phone_number, message):
     """
-    Normalise any Indian phone number to E.164 digits without '+'.
-    '9876543210'       -> '919876543210'
-    '+91 98765 43210'  -> '919876543210'
-    '919876543210'     -> '919876543210'
-    """
-    digits = "".join(c for c in raw if c.isdigit())
-    if len(digits) == 10:
-        return "91" + digits
-    if len(digits) == 12 and digits.startswith("91"):
-        return digits
-    return digits  # fallback — let Twilio surface the error
-
-
-# ── Message builder ───────────────────────────────────────────────────────────
-
-def build_order_confirmation(order) -> str:
-    """Build a human-readable order confirmation from an Order model instance."""
-    now = datetime.utcnow()
-    date_str = now.strftime("%d %b %Y, %I:%M %p") + " UTC"
-
-    item_lines = []
-    for item in order.items:
-        variant = item.variant
-        name    = variant.product.name if variant and variant.product else "Item"
-        qty     = item.quantity
-        price   = float(item.price_at_purchase) * qty
-        item_lines.append(f"  • {name} x{qty} — Rs.{price:,.0f}")
-
-    items_block = "\n".join(item_lines) if item_lines else "  (no items)"
-
-    return "\n".join([
-        "Order Confirmed!",
-        "",
-        f"Order ID       : #{order.id}",
-        f"Tracking No.   : {order.tracking_number or 'Generating...'}",
-        f"Status         : {order.status.replace('_', ' ').title()}",
-        "",
-        "Items Ordered:",
-        items_block,
-        "",
-        f"Total    : Rs.{float(order.total_amount):,.0f}",
-        f"Payment  : {order.payment_method}",
-        f"Date     : {date_str}",
-        "",
-        "Thank you for shopping with M&M Fashion!",
-        "We'll notify you when your order is shipped.",
-    ])
-
-
-# ── Core send ─────────────────────────────────────────────────────────────────
-
-def send_whatsapp_text(to_number: str, message: str) -> dict:
-    """
-    Send a WhatsApp message via Twilio.
-
+    Sends a WhatsApp message using the Meta WhatsApp Cloud API.
+    
     Args:
-        to_number : raw phone number (will be normalised to E.164)
-        message   : plain text body
-
+        phone_number (str): Recipient's phone number (with country code, no +)
+        message (str): The text message content
+    
     Returns:
-        dict — { success: bool, sid: str|None, detail: str }
+        dict: Success status and response details
     """
-    account_sid = os.getenv("TWILIO_ACCOUNT_SID", "").strip()
-    auth_token  = os.getenv("TWILIO_AUTH_TOKEN",  "").strip()
-    from_number = os.getenv("TWILIO_WHATSAPP_FROM", "").strip()
+    # Authorization token from environment variable
+    token = os.getenv("WHATSAPP_TOKEN")
+    # Phone Number ID from environment variable
+    phone_number_id = os.getenv("WHATSAPP_PHONE_NUMBER_ID")
+    
+    if not token or not phone_number_id:
+        logger.error("WhatsApp Cloud API credentials missing (WHATSAPP_TOKEN or WHATSAPP_PHONE_NUMBER_ID)")
+        return {"success": False, "detail": "Credentials missing"}
 
-    if not account_sid or not auth_token or not from_number:
-        print("[WhatsApp] Twilio credentials not configured — skipping send.")
-        return {"success": False, "sid": None, "detail": "credentials_not_configured"}
+    # Meta Graph API endpoint
+    url = f"https://graph.facebook.com/v19.0/{phone_number_id}/messages"
+    
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Content-Type": "application/json"
+    }
 
-    phone     = _format_phone(to_number)
-    to_wa     = f"whatsapp:+{phone}"
+    from phone_utils import format_phone_number
+    
+    # Normalize to E.164 format (+91...)
+    e164_phone = format_phone_number(phone_number)
+    
+    # Meta API expects the number with country code but usually without leading '+'
+    clean_phone = e164_phone.replace("+", "")
 
+    # Construct payload for text-only message
+    payload = {
+        "messaging_product": "whatsapp",
+        "recipient_type": "individual",
+        "to": clean_phone,
+        "type": "text",
+        "text": {
+            "preview_url": False,
+            "body": message
+        }
+    }
+
+    # Debug logging before sending
+    print(f"Sending WhatsApp via META API for order_id: {clean_phone}") # Note: basic send doesn't have order_id, wrappers do.
+    
     try:
-        from twilio.rest import Client
-        client = Client(account_sid, auth_token)
-        msg = client.messages.create(
-            from_=from_number,
-            to=to_wa,
-            body=message,
-        )
-        print("[WhatsApp] Sent to {} - SID: {}".format(to_wa, msg.sid))
-        return {"success": True, "sid": msg.sid, "detail": "sent"}
+        logger.info(f"Sending WhatsApp message to {clean_phone}...")
+        response = requests.post(url, headers=headers, json=payload, timeout=10)
+        
+        # Print status for debug as requested
+        print(f"Meta API Response Status: {response.status_code}")
 
-    except Exception as e:
-        print("[WhatsApp] Error: {}".format(str(e).encode("ascii", "replace").decode("ascii")))
-        return {"success": False, "sid": None, "detail": str(e)}
+        try:
+            response_data = response.json()
+        except ValueError:
+            response_data = {"raw_response": response.text}
 
+        if response.status_code == 200:
+            logger.info(f"WhatsApp message sent successfully. ID: {response_data.get('messages', [{}])[0].get('id')}")
+            return {"success": True, "data": response_data}
+        else:
+            logger.error(f"WhatsApp API Error ({response.status_code}): {response_data}")
+            return {
+                "success": False, 
+                "detail": response_data, 
+                "status_code": response.status_code
+            }
+            
+    except requests.exceptions.RequestException as e:
+        logger.error(f"WhatsApp Request failed: {str(e)}")
+        return {"success": False, "detail": str(e)}
 
-# ── Convenience wrapper ───────────────────────────────────────────────────────
+# ─── Existing Integration Wrappers ───────────────────────────────────────────
+# These maintain compatibility with the existing order flow
 
-def send_order_confirmation(order) -> dict:
-    """
-    Send an order confirmation WhatsApp to the customer.
-    Resolves phone from order.customer_phone, falling back to linked user.
-    Always returns a result dict — never raises.
-    """
-    # Resolve phone: prefer customer_phone on order, fall back to linked user
-    phone = (order.customer_phone or "").strip()
-    if not phone and order.user:
-        phone = (order.user.whatsapp_number or "").strip()
+def send_order_confirmation(order):
+    """Wrapper for CONFIRMED status."""
+    message_body = "🎉 Order Confirmed!\nYour M&M Fashion order has been placed successfully."
+    return _resolve_and_send(order, message_body)
 
-    if not phone:
-        print("[WhatsApp] No phone number for order #{} - skipping.".format(order.id))
-        return {"success": False, "sid": None, "detail": "no_phone_on_order"}
+def send_payment_rejection(order, reason=""):
+    """Wrapper for REJECTED status."""
+    message_body = "❌ Order Rejected\nYour payment/order could not be verified."
+    if reason:
+        message_body += f"\nReason: {reason}"
+    return _resolve_and_send(order, message_body)
 
-    message = build_order_confirmation(order)
-    return send_whatsapp_text(phone, message)
+def send_payment_received(order):
+    """Wrapper for PAID status."""
+    message_body = "💰 Payment Received\nWe are verifying your payment. You will be notified soon."
+    return _resolve_and_send(order, message_body)
+
+import threading
+
+def _resolve_and_send(order, message_body):
+    """Internal helper to resolve phone number and send message asynchronously."""
+    raw_phone = getattr(order, 'effective_whatsapp_number', None)
+    order_id = getattr(order, 'id', 'Unknown')
+
+    if not raw_phone:
+        logger.error(f"[Order #{order_id}] No phone number found")
+        return {"success": False, "detail": "No phone number"}
+
+    # Run in a background thread so it doesn't block the API response
+    # def run_async():
+    #     # Debug logging as requested
+    #     print(f"Sending WhatsApp via META API for order_id: {order_id}")
+    #     
+    #     logger.info(f"[Order #{order_id}] Triggering background WhatsApp notification...")
+    #     result = send_whatsapp_message(raw_phone, message_body)
+    #     if result["success"]:
+    #         logger.info(f"[Order #{order_id}] WhatsApp notification SUCCESS")
+    #     else:
+    #         logger.error(f"[Order #{order_id}] WhatsApp notification FAILED: {result.get('detail')}")
+
+    # thread = threading.Thread(target=run_async)
+    # thread.start()
+    
+    # Return immediately to avoid blocking
+    return {"success": True, "detail": "WhatsApp disabled"}

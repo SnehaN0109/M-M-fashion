@@ -166,7 +166,7 @@ const UploadUserPhotosPage = () => {
         <button
           type="submit"
           disabled={loading || !file}
-          className="w-full bg-pink-600 hover:bg-pink-700 text-white font-black py-4 rounded-2xl flex items-center justify-center gap-2 disabled:opacity-50 transition-all"
+          className="w-full bg-pink-600 hover:bg-pink-700 text-white font-black py-4 rounded-2xl flex items-center justify-center gap-2 disabled:opacity-50 transition-all active:scale-95"
         >
           {loading ? <Loader2 size={20} className="animate-spin" /> : <Upload size={20} />}
           {loading ? "Uploading..." : "Submit Photo"}

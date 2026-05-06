@@ -10,6 +10,7 @@ from functools import wraps
 import jwt as pyjwt
 from models import db, Order
 from utils import assign_tracking_number
+from sms_service import send_order_confirmation_sms, send_payment_rejection_sms, send_payment_received_sms
 
 payment_bp = Blueprint('payment', __name__)
 
@@ -84,8 +85,8 @@ def mark_order_paid(order_id):
         - Success message with order details
         - Payment status remains PENDING (awaiting admin verification)
     """
-    # Get order
-    order = Order.query.get_or_404(order_id)
+    # Get order with user joined for efficient phone lookup
+    order = Order.query.options(db.joinedload(Order.user)).get_or_404(order_id)
     
     # Optional: Verify user owns this order (only if whatsapp_number is provided)
     whatsapp = request.form.get('whatsapp_number', '').strip()
@@ -123,15 +124,13 @@ def mark_order_paid(order_id):
             except Exception as e:
                 return jsonify({"error": f"Failed to save file: {str(e)}"}), 500
 
-    # Mark as submitted — use uploaded path if file provided, else sentinel value
-    # This ensures re-upload is blocked even when no file was attached
+    # Standardize: Proof uploaded maps to PAID
     order.payment_proof = payment_proof_url if payment_proof_url else "submitted"
-    
-    # Keep payment_status as PENDING (awaiting admin verification)
-    # Do NOT change order status yet
+    order.status = 'PAID'
     
     db.session.commit()
     
+
     return jsonify({
         "message": "Payment proof uploaded successfully. Awaiting admin verification.",
         "order_id": order.id,
@@ -161,7 +160,7 @@ def admin_payment_action(order_id):
         - verify: Set payment_status=VERIFIED, order status=PLACED
         - reject: Set payment_status=FAILED, keep order status
     """
-    order = Order.query.get_or_404(order_id)
+    order = Order.query.options(db.joinedload(Order.user)).get_or_404(order_id)
     
     data = request.get_json(silent=True) or {}
     action = data.get('action', '').lower()
@@ -171,41 +170,84 @@ def admin_payment_action(order_id):
         return jsonify({"error": "Invalid action. Must be 'verify' or 'reject'"}), 400
     
     if action == 'verify':
+        order.status = 'PLACED'
         order.payment_status = 'VERIFIED'
 
-        # Move order to PLACED status (ready for fulfillment)
-        if order.status == 'PENDING_PAYMENT':
-            order.status = 'PLACED'
-
-        # Generate tracking number now that payment is confirmed
+        # Generate tracking number
         assign_tracking_number(order, db.session)
-
         db.session.commit()
 
+        # ── Send SMS Confirmation ─────────────────────────────────────────────
+        try:
+            send_order_confirmation_sms(order)
+        except Exception as e:
+            current_app.logger.error(f"[SMS] Order #{order.id} confirmation exception: {e}")
+
         return jsonify({
-            "message": "Payment verified successfully",
+            "message": "Order confirmed",
             "order_id": order.id,
-            "payment_status": order.payment_status,
             "status": order.status,
             "tracking_number": order.tracking_number,
         }), 200
     
     elif action == 'reject':
-        # Reject payment
+        order.status = 'REJECTED'
         order.payment_status = 'FAILED'
-        
-        # Optionally store rejection reason (would need a new field in model)
-        # For now, we just set status to FAILED
-        
         db.session.commit()
-        
+
+        # ── Send SMS Rejection ────────────────────────────────────────────────
+        try:
+            send_payment_rejection_sms(order, reason=reason)
+        except Exception as e:
+            current_app.logger.error(f"[SMS] Order #{order.id} rejection exception: {e}")
+
         return jsonify({
-            "message": "Payment rejected",
+            "message": "Order rejected",
             "order_id": order.id,
-            "payment_status": order.payment_status,
             "status": order.status,
-            "reason": reason if reason else None
+            "reason": reason
         }), 200
+
+
+# ─── Specific Status Update Endpoints ─────────────────────────────────────────
+
+@payment_bp.route('/api/orders/<int:order_id>/verify', methods=['POST'])
+@admin_required
+def verify_order_status(order_id):
+    """Specific endpoint for admin to verify an order."""
+    order = Order.query.options(db.joinedload(Order.user)).get_or_404(order_id)
+    order.status = 'PLACED'
+    order.payment_status = 'VERIFIED'
+    
+    assign_tracking_number(order, db.session)
+    db.session.commit()
+
+    try:
+        send_order_confirmation_sms(order)
+    except Exception as e:
+        current_app.logger.error(f"[SMS] Exception for Order #{order.id}: {e}")
+
+    return jsonify({"message": "Order confirmed", "status": order.status}), 200
+
+
+@payment_bp.route('/api/orders/<int:order_id>/reject', methods=['POST'])
+@admin_required
+def reject_order_status(order_id):
+    """Specific endpoint for admin to reject an order payment."""
+    order = Order.query.options(db.joinedload(Order.user)).get_or_404(order_id)
+    data = request.get_json(silent=True) or {}
+    reason = data.get('reason', '').strip()
+    
+    order.status = 'REJECTED'
+    order.payment_status = 'FAILED'
+    db.session.commit()
+
+    try:
+        send_payment_rejection_sms(order, reason=reason)
+    except Exception as e:
+        current_app.logger.error(f"[SMS] Exception for Order #{order.id}: {e}")
+
+    return jsonify({"message": "Order rejected", "status": order.status}), 200
 
 
 @payment_bp.route('/api/admin/payment-proof/<int:order_id>', methods=['GET'])
@@ -223,7 +265,7 @@ def get_payment_proof(order_id):
             "total_amount": 1499.0
         }
     """
-    order = Order.query.get_or_404(order_id)
+    order = Order.query.options(db.joinedload(Order.user)).get_or_404(order_id)
     
     return jsonify({
         "order_id": order.id,
@@ -258,7 +300,7 @@ def get_payment_status(order_id):
             "has_payment_proof": true
         }
     """
-    order = Order.query.get_or_404(order_id)
+    order = Order.query.options(db.joinedload(Order.user)).get_or_404(order_id)
     
     # Optional: Verify user owns this order
     whatsapp = request.args.get('whatsapp_number', '').strip()

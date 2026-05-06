@@ -1,4 +1,5 @@
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+import { Toaster } from "react-hot-toast";
 
 /* ===== Layout Components ===== */
 import Navbar from "./components/Navbar";
@@ -15,7 +16,7 @@ import OrderSuccessPage from "./pages/OrderSuccessPage";
 import TrackOrderPage from "./pages/TrackOrderPage";
 import SearchResultsPage from "./pages/SearchResultsPage";
 import WishlistPage from "./pages/WishlistPage";
-import WhatsAppLoginPage from "./pages/WhatsAppLoginPage";
+import LoginPage from "./pages/LoginPage";
 import MyOrdersPage from "./pages/MyOrdersPage";
 import UploadUserPhotosPage from "./pages/UploadUserPhotosPage";
 import AboutUsPage from "./pages/AboutUsPage";
@@ -36,6 +37,7 @@ import DevDomainSwitcher from "./components/DevDomainSwitcher";
 function App() {
   return (
     <Router>
+      <Toaster position="top-center" toastOptions={{ duration: 2500, style: { fontWeight: 600, fontSize: "13px" } }} />
       <Navbar />
 
       <Routes>
@@ -72,8 +74,8 @@ function App() {
         <Route path="/wishlist" element={<WishlistPage />} />
 
         {/* ===== Authentication ===== */}
-        <Route path="/login" element={<WhatsAppLoginPage />} />
-        <Route path="/whatsapp-login" element={<WhatsAppLoginPage />} />
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/phone-login" element={<LoginPage />} />
 
         {/* ===== Upload Photos ===== */}
         <Route path="/upload-photos" element={<UploadUserPhotosPage />} />

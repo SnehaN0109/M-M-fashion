@@ -42,3 +42,6 @@ class Config:
     MAIL_USERNAME = os.getenv('EMAIL_USER')
     MAIL_PASSWORD = os.getenv('EMAIL_PASS')
     MAIL_DEFAULT_SENDER = os.getenv('EMAIL_USER')
+
+    # Fast2SMS API Configuration
+    FAST2SMS_API_KEY = os.getenv("FAST2SMS_API_KEY")

@@ -23,7 +23,7 @@ const dbRowToItem = (row, priceKey = "price_b2c") => ({
 
 export const CartProvider = ({ children }) => {
   const [cartItems, setCartItems] = useState(() => {
-    const wa = localStorage.getItem("whatsapp_number");
+    const wa = localStorage.getItem("phone_number");
     if (!wa) {
       // Guest: load from guest_cart (no user logged in)
       const guestCart = localStorage.getItem("guest_cart");
@@ -42,7 +42,7 @@ export const CartProvider = ({ children }) => {
   });
   const [cartLoading, setCartLoading] = useState(false);
 
-  const whatsapp = () => localStorage.getItem("whatsapp_number");
+  const whatsapp = () => localStorage.getItem("phone_number");
   const priceKey = () => {
     const hostname = window.location.hostname;
     let d = "garba.shop"; // default
@@ -69,7 +69,7 @@ export const CartProvider = ({ children }) => {
     if (!wa) return;
     setCartLoading(true);
     try {
-      const res = await fetch(`${API}/cart?whatsapp_number=${encodeURIComponent(wa)}`);
+      const res = await fetch(`${API}/cart?phone_number=${encodeURIComponent(wa)}`);
       if (!res.ok) return;
       const rows = await res.json();
       const pk = priceKey();
@@ -125,7 +125,7 @@ export const CartProvider = ({ children }) => {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            whatsapp_number: wa,
+            phone_number: wa,
             variant_id: variantId,
             quantity: product.cartQuantity || 1,
           }),
@@ -151,7 +151,7 @@ export const CartProvider = ({ children }) => {
         await fetch(`${API}/cart/remove`, {
           method: "DELETE",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ whatsapp_number: wa, variant_id: variantId }),
+          body: JSON.stringify({ phone_number: wa, variant_id: variantId }),
         });
       } catch {
         // silent
@@ -180,7 +180,7 @@ export const CartProvider = ({ children }) => {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            whatsapp_number: wa,
+            phone_number: wa,
             variant_id: variantId,
             quantity: newQuantity,
           }),
@@ -214,7 +214,7 @@ export const CartProvider = ({ children }) => {
           await fetch(`${API}/cart/remove`, {
             method: "DELETE",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ whatsapp_number: wa, variant_id: variantId }),
+            body: JSON.stringify({ phone_number: wa, variant_id: variantId }),
           });
         } catch {
           // silent
@@ -238,7 +238,7 @@ export const CartProvider = ({ children }) => {
         await fetch(`${API}/cart/clear`, {
           method: "DELETE",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ whatsapp_number: wa }),
+          body: JSON.stringify({ phone_number: wa }),
         });
       } catch {
         // silent

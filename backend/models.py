@@ -7,7 +7,7 @@ db = SQLAlchemy()
 class User(db.Model):
     __tablename__ = 'user'
     id = db.Column(db.Integer, primary_key=True)
-    whatsapp_number = db.Column(db.String(20), unique=True, nullable=True)
+    phone_number = db.Column('whatsapp_number', db.String(20), unique=True, nullable=True)
     email = db.Column(db.String(120), unique=True, nullable=True)
     name = db.Column(db.String(100), nullable=True)
     # B2B role: 'B2C' (default) or 'WHOLESALER'
@@ -42,7 +42,7 @@ class Product(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(255), nullable=False)
     description = db.Column(db.Text)
-    category = db.Column(db.String(100))   # Men, Women, Kids, Ethnic, Western, Party Wear
+    category = db.Column(db.String(100), index=True)   # Men, Women, Kids, Ethnic, Western, Party Wear
     fabric = db.Column(db.String(100))     # Cotton, Silk, Georgette, etc.
     occasion = db.Column(db.String(100))   # Casual, Festive, Wedding, etc.
     pattern = db.Column(db.String(100))    # Solid, Printed, Embroidered, etc.
@@ -142,7 +142,7 @@ class Order(db.Model):
     # Meta
     domain_origin = db.Column(db.String(100))
     payment_method = db.Column(db.String(50), default='UPI')
-    status = db.Column(db.String(50), default='PENDING_PAYMENT')
+    status = db.Column(db.String(50), default='PENDING')
     payment_status = db.Column(db.String(20), default='PENDING')
     tracking_number = db.Column(db.String(100), nullable=True)
     payment_proof = db.Column(db.String(500), nullable=True)
@@ -153,6 +153,16 @@ class Order(db.Model):
 
     items = db.relationship('OrderItem', backref='order', lazy=True, cascade="all, delete-orphan")
 
+    @property
+    def effective_notification_number(self):
+        """
+        Returns the best phone number for notifications.
+        Priority: Linked User's Number > Checkout Customer Phone.
+        """
+        if self.user and self.user.phone_number:
+            return self.user.phone_number
+        return self.customer_phone
+
     def to_dict(self):
         return {
             'id': self.id,
@@ -160,6 +170,8 @@ class Order(db.Model):
             'customer_name': self.customer_name,
             'customer_email': self.customer_email,
             'customer_phone': self.customer_phone,
+            'phone_number': self.effective_notification_number,
+            'whatsapp_number': self.effective_notification_number, # Keep for frontend compat
             'address_line1': self.address_line1,
             'address_line2': self.address_line2,
             'city': self.city,
@@ -227,6 +239,8 @@ class Wishlist(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     product_id = db.Column(db.Integer, db.ForeignKey('product.id'), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    __table_args__ = (db.UniqueConstraint('user_id', 'product_id'),)
 
 
 class SiteSetting(db.Model):

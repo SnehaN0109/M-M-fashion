@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useDomain } from "../context/DomainContext";
 import ProductCard from "../components/ProductCard";
 import { Search, SlidersHorizontal, PackageX, Loader2 } from "lucide-react";
@@ -20,27 +20,27 @@ const Filters = ({ onFilter, activeFilters }) => {
   };
 
   return (
-    <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100 space-y-8 sticky top-24 h-fit hidden lg:block w-72">
-      <div className="flex items-center justify-between border-b pb-4">
-        <h2 className="font-black text-xl text-gray-900 tracking-tight">Filters</h2>
-        <SlidersHorizontal size={18} className="text-gray-400" />
+    <div className="bg-white rounded-2xl p-5 border border-gray-100 space-y-7 sticky top-20 h-fit hidden lg:block w-64 flex-shrink-0">
+      <div className="flex items-center justify-between pb-4 border-b border-gray-100">
+        <h2 className="font-semibold text-sm text-black">Filters</h2>
+        <SlidersHorizontal size={15} className="text-gray-400" />
       </div>
       
       {/* Category */}
-      <div className="space-y-4">
-        <h3 className="text-xs font-black text-gray-400 uppercase tracking-widest">Collection</h3>
-        <div className="space-y-2">
+      <div className="space-y-3">
+        <h3 className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">Category</h3>
+        <div className="space-y-1">
           {["", ...categories].map((cat) => (
-            <label key={cat} className="flex items-center gap-3 cursor-pointer group">
-              <input 
-                type="radio" 
-                name="category" 
+            <label key={cat} className="flex items-center gap-2.5 cursor-pointer group py-1">
+              <input
+                type="radio"
+                name="category"
                 checked={filters.category === cat}
                 onChange={() => handleChange("category", cat)}
-                className="w-4 h-4 accent-pink-600 border-gray-300"
+                className="w-3.5 h-3.5 accent-black border-gray-300"
               />
-              <span className={`text-sm font-medium transition-colors ${filters.category === cat ? "text-pink-600" : "text-gray-600 group-hover:text-gray-900"}`}>
-                {cat || "All Collections"}
+              <span className={`text-sm transition-colors ${filters.category === cat ? "text-black font-semibold" : "text-gray-500 group-hover:text-black"}`}>
+                {cat || "All"}
               </span>
             </label>
           ))}
@@ -48,14 +48,14 @@ const Filters = ({ onFilter, activeFilters }) => {
       </div>
 
       {/* Sizes */}
-      <div className="space-y-4">
-        <h3 className="text-xs font-black text-gray-400 uppercase tracking-widest">Size</h3>
-        <div className="flex flex-wrap gap-2">
+      <div className="space-y-3">
+        <h3 className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">Size</h3>
+        <div className="flex flex-wrap gap-1.5">
           {sizes.map((opt) => (
             <button
               key={opt}
               onClick={() => handleChange("size", filters.size === opt ? "" : opt)}
-              className={`w-10 h-10 flex items-center justify-center rounded-xl border text-xs font-bold transition-all ${filters.size === opt ? "bg-gray-900 text-white border-gray-900 shadow-lg" : "border-gray-100 hover:border-pink-300 text-gray-600"}`}
+              className={`w-9 h-9 flex items-center justify-center rounded-lg border text-xs font-medium transition-all ${filters.size === opt ? "bg-black text-white border-black" : "border-gray-200 text-gray-600 hover:border-gray-400"}`}
             >
               {opt}
             </button>
@@ -64,37 +64,36 @@ const Filters = ({ onFilter, activeFilters }) => {
       </div>
 
       {/* Colors */}
-      <div className="space-y-4">
-        <h3 className="text-xs font-black text-gray-400 uppercase tracking-widest">Color</h3>
+      <div className="space-y-3">
+        <h3 className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">Color</h3>
         <div className="grid grid-cols-5 gap-2">
           {colors.map((c) => (
-            <button 
+            <button
               key={c}
               onClick={() => handleChange("color", filters.color === c ? "" : c)}
               title={c}
-              className={`w-8 h-8 rounded-full border-2 transition-all scale-95 hover:scale-110 ${filters.color === c ? "border-pink-600 p-0.5" : "border-transparent"}`}
-            >
-              <div className="w-full h-full rounded-full shadow-inner" style={{ backgroundColor: c.toLowerCase() }} />
-            </button>
+              className={`w-7 h-7 rounded-full border-2 transition-all hover:scale-110 ${filters.color === c ? "border-black scale-110" : "border-transparent"}`}
+              style={{ backgroundColor: c.toLowerCase() }}
+            />
           ))}
         </div>
       </div>
 
       {/* Price */}
-      <div className="space-y-4">
-        <h3 className="text-xs font-black text-gray-400 uppercase tracking-widest">Price Point</h3>
-        <div className="grid grid-cols-2 gap-3">
-          <input 
-             type="number" 
-             placeholder="From" 
-             className="bg-gray-50 border-none rounded-xl p-3 text-sm focus:ring-2 ring-pink-500 w-full"
-             onChange={(e) => handleChange("min_price", e.target.value)} 
+      <div className="space-y-3">
+        <h3 className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">Price</h3>
+        <div className="grid grid-cols-2 gap-2">
+          <input
+            type="number"
+            placeholder="Min"
+            className="bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-black/10 w-full"
+            onChange={(e) => handleChange("min_price", e.target.value)}
           />
-          <input 
-             type="number" 
-             placeholder="To" 
-             className="bg-gray-50 border-none rounded-xl p-3 text-sm focus:ring-2 ring-pink-500 w-full"
-             onChange={(e) => handleChange("max_price", e.target.value)} 
+          <input
+            type="number"
+            placeholder="Max"
+            className="bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-black/10 w-full"
+            onChange={(e) => handleChange("max_price", e.target.value)}
           />
         </div>
       </div>
@@ -109,18 +108,39 @@ const ProductListPage = ({ category: initialCategory }) => {
   const [error, setError] = useState(null);
   const [search, setSearch] = useState("");
 
+  const categoryCache = useRef({});
+
   const fetchProducts = async (filters = {}) => {
+    // Determine the category to fetch/cache based on filters or initialCategory
+    const cat = filters.category !== undefined ? filters.category : (initialCategory || "");
+    const cacheKey = cat || "all";
+    
+    // Use cache if no complex filters are applied and it exists
+    const hasComplexFilters = !!(filters.size || filters.color || filters.min_price || filters.max_price || filters.search);
+    if (!hasComplexFilters && categoryCache.current[cacheKey]) {
+      setProducts(categoryCache.current[cacheKey]);
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
     try {
       const queryParams = new URLSearchParams({
         domain: domain || window.location.hostname,
         price_key: priceKey || "price_b2c",
-        category: initialCategory || "",
+        category: cat,
         ...filters
       });
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/products/?${queryParams}`);
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/products/?${queryParams}`, {
+        headers: { 'Cache-Control': 'max-age=300' }
+      });
       if (!response.ok) throw new Error("Our shop is currently restyling. Please try again later.");
       const data = await response.json();
+      
+      // Save to cache if no complex filters
+      if (!hasComplexFilters) {
+        categoryCache.current[cacheKey] = data;
+      }
       setProducts(data);
     } catch (err) {
       setError(err.message);
@@ -131,6 +151,22 @@ const ProductListPage = ({ category: initialCategory }) => {
 
   useEffect(() => {
     fetchProducts();
+    
+    // Prefetch neighboring categories silently
+    const prefetchCategories = ['Men', 'Women', 'Ethnic', 'Kids'];
+    prefetchCategories.forEach(cat => {
+      if (cat !== initialCategory && !categoryCache.current[cat]) {
+        const queryParams = new URLSearchParams({
+          domain: domain || window.location.hostname,
+          price_key: priceKey || "price_b2c",
+          category: cat
+        });
+        fetch(`${import.meta.env.VITE_API_URL}/api/products/?${queryParams}`)
+          .then(r => r.json())
+          .then(data => { categoryCache.current[cat] = data; })
+          .catch(() => {});
+      }
+    });
   }, [domain, priceKey, initialCategory]);
 
   const handleFilter = (filters) => {
@@ -143,90 +179,73 @@ const ProductListPage = ({ category: initialCategory }) => {
   };
 
   return (
-    <div className="bg-[#fafafa] min-h-screen">
-      {/* Dynamic Header */}
-      <div className="bg-white pt-12 pb-16 border-b border-gray-100">
-        <div className="max-w-7xl mx-auto px-6 flex flex-col items-center text-center">
-          <h1 className="text-5xl md:text-6xl font-black text-gray-900 tracking-tighter mb-4">
-            New Collections <span className="text-pink-600">.</span>
+    <div className="bg-white min-h-screen">
+      {/* Page Header */}
+      <div className="border-b border-gray-100 py-10">
+        <div className="max-w-7xl mx-auto px-6">
+          <h1 className="text-3xl font-black text-black tracking-tight mb-1">
+            {initialCategory || "All Collections"}
           </h1>
-          <p className="max-w-xl text-gray-500 font-medium text-lg leading-relaxed">
-            Curated pieces from premium labels, designed for comfort and crafted with elegance.
+          <p className="text-sm text-gray-400">
+            {products.length > 0 ? `${products.length} products` : "Curated pieces for every occasion"}
           </p>
-          
-          {/* Search Bar */}
-          <form onSubmit={handleSearch} className="mt-8 relative w-full max-w-2xl group">
-             <input 
-                type="text" 
-                placeholder="Search for styles, collections, or trends..."
-                className="w-full bg-white border border-gray-200 rounded-2xl py-5 pl-14 pr-6 text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-4 focus:ring-pink-500/10 focus:border-pink-600 transition-all shadow-sm group-hover:shadow-md"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-             />
-             <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-400 group-hover:text-pink-600 transition-colors" size={22} />
-             <button type="submit" className="hidden">Search</button>
-          </form>
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-6 flex gap-12 py-16">
+      <div className="max-w-7xl mx-auto px-6 flex gap-8 py-10">
         {/* Sidebar */}
         <Filters onFilter={handleFilter} />
 
-        {/* Product Grid Container */}
-        <div className="flex-1">
+        {/* Main */}
+        <div className="flex-1 min-w-0">
+          {/* Toolbar */}
+          <div className="flex items-center justify-between mb-6 gap-4">
+            <form onSubmit={handleSearch} className="relative flex-1 max-w-sm">
+              <input
+                type="text"
+                placeholder="Search products..."
+                className="w-full bg-gray-50 border border-gray-200 rounded-xl py-2.5 pl-9 pr-4 text-sm text-gray-700 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-black/10 focus:border-gray-400 transition-all"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={15} />
+            </form>
+            <select className="border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-gray-600 bg-white focus:outline-none focus:ring-2 focus:ring-black/10 cursor-pointer">
+              <option>Latest</option>
+              <option>Price: Low to High</option>
+              <option>Price: High to Low</option>
+            </select>
+          </div>
+
           {loading ? (
-            <div className="flex flex-col items-center justify-center py-32 space-y-4">
-              <Loader2 className="w-12 h-12 text-pink-600 animate-spin" />
-              <p className="text-sm font-bold text-gray-400 uppercase tracking-widest">Loading styles...</p>
+            <div className="grid grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-6">
+              {[...Array(9)].map((_, i) => (
+                <div key={i} className="animate-pulse bg-gray-100 rounded-2xl h-[380px] w-full" />
+              ))}
             </div>
           ) : error ? (
-            <div className="bg-white border-2 border-dashed border-red-100 p-12 rounded-[40px] text-center max-w-lg mx-auto">
-              <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-6 text-red-600">
-                 <PackageX size={32} />
-              </div>
-              <h2 className="text-2xl font-black text-gray-900 mb-2">Oops! Integration Issue</h2>
-              <p className="text-gray-500 mb-8">{error}</p>
-              <button 
-                onClick={() => fetchProducts()} 
-                className="px-8 py-3 bg-gray-900 text-white font-bold rounded-2xl hover:bg-black transition shadow-lg active:scale-95"
+            <div className="text-center py-24 border border-dashed border-gray-200 rounded-2xl">
+              <PackageX size={36} className="mx-auto text-gray-300 mb-4" />
+              <h3 className="text-base font-semibold text-gray-700 mb-2">Something went wrong</h3>
+              <p className="text-sm text-gray-400 mb-6">{error}</p>
+              <button
+                onClick={() => fetchProducts()}
+                className="px-6 py-2.5 bg-black text-white text-sm font-semibold rounded-xl hover:bg-gray-800 transition active:scale-95"
               >
-                Reconnect to Shop
+                Try Again
               </button>
             </div>
+          ) : products.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-32 gap-4">
+              <Search size={36} className="text-gray-200" />
+              <p className="text-sm text-gray-400">No products found. Try different filters.</p>
+            </div>
           ) : (
-            <>
-              <div className="mb-10 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                <div>
-                   <span className="text-sm font-black text-gray-400 uppercase tracking-widest">Results</span>
-                   <h2 className="text-2xl font-bold text-gray-900">{products.length} Products Found</h2>
-                </div>
-                
-                <div className="flex items-center gap-4 bg-white p-2 rounded-2xl border border-gray-100 shadow-sm">
-                   <select className="border-none bg-transparent text-sm font-bold text-gray-700 focus:ring-0 cursor-pointer pr-8">
-                     <option>Sort by: Latest Arrived</option>
-                     <option>Price: Low to High</option>
-                     <option>Price: High to Low</option>
-                   </select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-8">
-                {products.map((product) => (
-                  <ProductCard key={product.id} product={product} />
-                ))}
-              </div>
-
-              {products.length === 0 && (
-                <div className="flex flex-col items-center justify-center py-32 bg-white rounded-[40px] border border-gray-100 shadow-sm">
-                  <div className="w-20 h-20 bg-gray-50 rounded-full flex items-center justify-center mb-6 text-gray-300">
-                     <Search size={40} />
-                  </div>
-                  <h3 className="text-2xl font-bold text-gray-900 mb-2">No matching styles</h3>
-                  <p className="text-gray-500">Try adjusting your filters or search terms.</p>
-                </div>
-              )}
-            </>
+            <div className="grid grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-6">
+              {products.map((product) => (
+                <ProductCard key={product.id} product={product} />
+              ))}
+            </div>
           )}
         </div>
       </div>

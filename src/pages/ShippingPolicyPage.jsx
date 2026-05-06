@@ -52,7 +52,7 @@ const ShippingPolicyPage = () => {
         </Section>
 
         <Section title="Order Tracking">
-          <p>Once your order is shipped, you will receive a tracking number via WhatsApp/email.</p>
+          <p>Once your order is shipped, you will receive a tracking number via SMS/email.</p>
           <p>You can also track your order anytime from the <strong>My Orders</strong> section.</p>
         </Section>
 

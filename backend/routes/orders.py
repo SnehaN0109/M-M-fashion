@@ -1,7 +1,7 @@
 from flask import Blueprint, jsonify, request
 from models import db, Order, OrderItem, ProductVariant, DiscountCode, User
 from utils import resolve_price_key, is_b2b_domain, assign_tracking_number
-from whatsapp_service import send_order_confirmation
+from sms_service import send_sms, send_order_confirmation_sms, send_payment_rejection_sms, send_payment_received_sms
 
 orders_bp = Blueprint('orders', __name__)
 
@@ -29,9 +29,9 @@ def checkout():
     # ── Role check: B2B domains require WHOLESALER role ──────────────────────
     # If user is not a wholesaler, silently fall back to B2C pricing (safe degradation)
     effective_domain = domain
-    whatsapp = data.get('whatsapp_number', '').strip()
+    whatsapp = data.get('phone_number', '').strip()
     if b2b and whatsapp:
-        user_check = User.query.filter_by(whatsapp_number=whatsapp).first()
+        user_check = User.query.filter_by(phone_number=whatsapp).first()
         if not user_check or user_check.role != 'WHOLESALER':
             # Non-wholesaler attempting B2B domain — fall back to B2C pricing
             effective_domain = 'garba.shop'
@@ -105,11 +105,23 @@ def checkout():
 
     total_amount = subtotal - discount_amount + shipping_charge
 
+    from phone_utils import format_phone_number
+    customer_phone = format_phone_number(data.get('customer_phone'))
+    whatsapp = format_phone_number(data.get('phone_number'))
+
+    # Link to user if whatsapp number provided
+    user_id = None
+    if whatsapp:
+        user = User.query.filter_by(phone_number=whatsapp).first()
+        if user:
+            user_id = user.id
+
     # Create order
     order = Order(
-        customer_name=data['customer_name'],
-        customer_email=data['customer_email'],
-        customer_phone=data['customer_phone'],
+        user_id=user_id,
+        customer_name=data.get('customer_name'),
+        customer_email=data.get('customer_email'),
+        customer_phone=customer_phone,
         address_line1=data['address_line1'],
         address_line2=data.get('address_line2', ''),
         city=data['city'],
@@ -123,18 +135,12 @@ def checkout():
         total_amount=total_amount,
         domain_origin=domain,
         payment_method=data.get('payment_method', 'UPI'),
-        status='PENDING_PAYMENT',
+        status='PENDING',
         payment_status='PENDING',
         # B2B optional fields
         business_name=data.get('business_name') if b2b else None,
         gst_number=data.get('gst_number') if b2b else None,
     )
-
-    # Link to user if whatsapp number provided
-    if whatsapp:
-        user = User.query.filter_by(whatsapp_number=whatsapp).first()
-        if user:
-            order.user_id = user.id
 
     db.session.add(order)
     db.session.flush()  # get order.id
@@ -157,12 +163,22 @@ def checkout():
     assign_tracking_number(order, db.session)
 
     db.session.commit()
-
-    # ── Send WhatsApp order confirmation (fire-and-forget, never blocks order) ─
+    
+    # ── SMS Notification ──
     try:
-        send_order_confirmation(order)
-    except Exception:
-        pass  # WhatsApp failure must never fail the order
+        message = (
+            f"Dear {order.customer_name}, your order #{order.id} has been placed successfully on M&M Fashion. "
+            f"Amount: Rs.{order.total_amount}. Please upload your UPI payment screenshot to confirm. "
+            f"Track: MM{order.id}"
+        )
+        send_sms(order.customer_phone, message)
+        print(f"Order placement SMS sent to {order.customer_phone}")
+    except Exception as e:
+        print(f"SMS failed (non-critical): {e}")
+
+    # ── WhatsApp is NOT sent here ─────────────────────────────────────────────
+    # Message is sent ONLY after admin verifies payment (see payment.py)
+    # Order status remains PENDING_PAYMENT until admin approves.
 
     return jsonify({
         "message": "Order placed successfully",
@@ -224,21 +240,18 @@ def track_order(order_id):
     })
 
 
-# ─── WhatsApp Notify (manual retry) ─────────────────────────────────────────
-
-@orders_bp.route('/<int:order_id>/notify-whatsapp', methods=['POST'])
-def notify_whatsapp(order_id):
+# ─── SMS Notify (manual retry) ──────────────────────────────────────────────
+@orders_bp.route('/<int:order_id>/notify-sms', methods=['POST'])
+def notify_sms(order_id):
     """
-    Manually trigger a WhatsApp order confirmation.
-    Useful for retrying failed sends or testing without re-placing an order.
-    Always returns 200 — WhatsApp failure is non-critical.
+    Manually trigger an SMS order confirmation.
     """
     order = Order.query.get_or_404(order_id)
-    result = send_order_confirmation(order)
+    result = send_order_confirmation_sms(order)
     if result["success"]:
-        return jsonify({"message": "WhatsApp notification sent", "order_id": order_id}), 200
+        return jsonify({"message": "SMS notification sent", "order_id": order_id}), 200
     return jsonify({
-        "message": "WhatsApp notification failed (order not affected)",
+        "message": "SMS notification failed (order not affected)",
         "detail": result["detail"],
         "order_id": order_id,
     }), 200
@@ -248,10 +261,10 @@ def notify_whatsapp(order_id):
 
 @orders_bp.route('/my-orders', methods=['GET'])
 def my_orders():
-    whatsapp = request.args.get('whatsapp_number')
+    whatsapp = request.args.get('phone_number')
     if not whatsapp:
-        return jsonify({"error": "whatsapp_number is required"}), 400
-    user = User.query.filter_by(whatsapp_number=whatsapp).first()
+        return jsonify({"error": "phone_number is required"}), 400
+    user = User.query.filter_by(phone_number=whatsapp).first()
     if not user:
         return jsonify([])
     orders = Order.query.filter_by(user_id=user.id).order_by(Order.created_at.desc()).all()
